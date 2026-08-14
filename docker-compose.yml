@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: finac_app
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=F2Wgk8qLrT7mXvYpQ9nCz3d
+      - POSTGRES_DB=finac-db
+      - JWT_SECRET=finac_secret_jwt_key_2026_super_secure
+    restart: always
+
+networks:
+  default:
+    name: finac_network
