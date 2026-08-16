@@ -130,25 +130,31 @@ export default function Header({
             </button>
           )}
 
-          {/* New Transaction Dropdown / Buttons */}
-          <div className="flex items-center gap-1.5 bg-slate-900/90 p-1 border border-slate-800 rounded-xl">
+          {/* New Transaction Action Buttons */}
+          <div className="flex items-center gap-1.5 bg-slate-900/90 p-1 border border-slate-800/80 rounded-xl shadow-inner">
             <button
               onClick={() => onOpenTransactionModal("income")}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-400 hover:bg-emerald-950/60 rounded-lg transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-lg transition-all shadow-sm"
+              title="Nova Receita"
             >
-              <Plus className="w-3.5 h-3.5" /> + Receita
+              <Plus className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span>Receita</span>
             </button>
             <button
               onClick={() => onOpenTransactionModal("fixed_expense")}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-purple-400 hover:bg-purple-950/60 rounded-lg transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-purple-400 hover:text-purple-300 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 rounded-lg transition-all shadow-sm"
+              title="Nova Despesa Fixa"
             >
-              <Plus className="w-3.5 h-3.5" /> + Fixa
+              <Plus className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+              <span>Fixa</span>
             </button>
             <button
               onClick={() => onOpenTransactionModal("variable_expense")}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-rose-400 hover:bg-rose-950/60 rounded-lg transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-rose-400 hover:text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 rounded-lg transition-all shadow-sm"
+              title="Novo Gasto Variável"
             >
-              <Plus className="w-3.5 h-3.5" /> + Variável
+              <Plus className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+              <span>Variável</span>
             </button>
           </div>
         </div>
@@ -160,21 +166,21 @@ export default function Header({
           <div className="grid grid-cols-3 gap-2">
             <button
               onClick={() => { onOpenTransactionModal("income"); setMobileMenuOpen(false); }}
-              className="py-2 px-2 bg-emerald-950/80 border border-emerald-800 text-emerald-300 rounded-lg text-xs font-semibold text-center"
+              className="flex items-center justify-center gap-1.5 py-2 px-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-lg text-xs font-semibold hover:bg-emerald-500/20 transition-all"
             >
-              + Receita
+              <Plus className="w-3.5 h-3.5" /> Receita
             </button>
             <button
               onClick={() => { onOpenTransactionModal("fixed_expense"); setMobileMenuOpen(false); }}
-              className="py-2 px-2 bg-purple-950/80 border border-purple-800 text-purple-300 rounded-lg text-xs font-semibold text-center"
+              className="flex items-center justify-center gap-1.5 py-2 px-2 bg-purple-500/10 border border-purple-500/20 text-purple-400 rounded-lg text-xs font-semibold hover:bg-purple-500/20 transition-all"
             >
-              + Despesa Fixa
+              <Plus className="w-3.5 h-3.5" /> Fixa
             </button>
             <button
               onClick={() => { onOpenTransactionModal("variable_expense"); setMobileMenuOpen(false); }}
-              className="py-2 px-2 bg-rose-950/80 border border-rose-800 text-rose-300 rounded-lg text-xs font-semibold text-center"
+              className="flex items-center justify-center gap-1.5 py-2 px-2 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-lg text-xs font-semibold hover:bg-rose-500/20 transition-all"
             >
-              + Gasto Variável
+              <Plus className="w-3.5 h-3.5" /> Variável
             </button>
           </div>
 
@@ -213,6 +219,13 @@ export default function Header({
               Transações
             </Link>
             <Link
+              href="/agent"
+              onClick={() => setMobileMenuOpen(false)}
+              className={`block px-3 py-2 rounded-lg text-sm font-medium ${pathname === "/agent" ? "bg-brand-600 text-white" : "text-slate-300"}`}
+            >
+              Agente IA
+            </Link>
+            <Link
               href="/categories"
               onClick={() => setMobileMenuOpen(false)}
               className={`block px-3 py-2 rounded-lg text-sm font-medium ${pathname === "/categories" ? "bg-brand-600 text-white" : "text-slate-300"}`}
@@ -232,6 +245,13 @@ export default function Header({
               className={`block px-3 py-2 rounded-lg text-sm font-medium ${pathname === "/reports" ? "bg-brand-600 text-white" : "text-slate-300"}`}
             >
               Relatórios
+            </Link>
+            <Link
+              href="/family"
+              onClick={() => setMobileMenuOpen(false)}
+              className={`block px-3 py-2 rounded-lg text-sm font-medium ${pathname === "/family" ? "bg-brand-600 text-white" : "text-slate-300"}`}
+            >
+              Controle Familiar
             </Link>
             <Link
               href="/settings"

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth";
 import { getDataSource } from "@/lib/db/data-source";
 import { Account, AccountType } from "@/lib/db/entities/Account";
+import { In } from "typeorm";
+import { getFamilyUserIds } from "@/lib/db/family-helper";
 
 export async function GET(req: NextRequest) {
   try {
@@ -11,8 +13,10 @@ export async function GET(req: NextRequest) {
     const dataSource = await getDataSource();
     const accountRepo = dataSource.getRepository(Account);
 
+    const userIds = await getFamilyUserIds(user.id);
+
     const accounts = await accountRepo.find({
-      where: { user_id: user.id },
+      where: { user_id: In(userIds) },
       order: { name: "ASC" }
     });
 

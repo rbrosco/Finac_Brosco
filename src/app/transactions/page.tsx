@@ -20,7 +20,8 @@ import {
   Tag,
   Wallet,
   Loader2,
-  RefreshCw
+  RefreshCw,
+  User
 } from "lucide-react";
 
 export default function TransactionsPage() {
@@ -286,19 +287,20 @@ export default function TransactionsPage() {
               Nenhum lançamento encontrado para os filtros selecionados.
             </div>
           ) : (
-            <div className="glass-card rounded-2xl overflow-hidden border border-slate-800">
+            <div className="glass-card rounded-2xl overflow-hidden border border-slate-800/80 shadow-xl">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-900/80 text-slate-400 font-semibold border-b border-slate-800 uppercase tracking-wider">
+                  <thead className="bg-slate-900/90 text-slate-400 font-bold border-b border-slate-800 uppercase tracking-wider text-[11px]">
                     <tr>
-                      <th className="p-4">Título</th>
-                      <th className="p-4">Tipo</th>
-                      <th className="p-4">Categoria</th>
-                      <th className="p-4">Conta</th>
-                      <th className="p-4">Vencimento</th>
-                      <th className="p-4">Valor</th>
-                      <th className="p-4">Status</th>
-                      <th className="p-4 text-right">Ações</th>
+                      <th className="py-3.5 px-4">Título</th>
+                      <th className="py-3.5 px-4 whitespace-nowrap">Membro</th>
+                      <th className="py-3.5 px-4 whitespace-nowrap">Tipo</th>
+                      <th className="py-3.5 px-4 whitespace-nowrap">Categoria</th>
+                      <th className="py-3.5 px-4 whitespace-nowrap">Conta</th>
+                      <th className="py-3.5 px-4 whitespace-nowrap">Vencimento</th>
+                      <th className="py-3.5 px-4 whitespace-nowrap">Valor</th>
+                      <th className="py-3.5 px-4 whitespace-nowrap">Status</th>
+                      <th className="py-3.5 px-4 text-right whitespace-nowrap">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/60">
@@ -307,55 +309,93 @@ export default function TransactionsPage() {
                       const isPaid = tx.status === "paid";
 
                       return (
-                        <tr key={tx.id} className="hover:bg-slate-800/30 transition-colors">
-                          <td className="p-4 font-semibold text-slate-200">
-                            {tx.title}
+                        <tr key={tx.id} className="hover:bg-slate-800/40 transition-colors">
+                          <td className="py-3.5 px-4 font-semibold text-slate-100 text-sm">
+                            <div className="font-semibold text-slate-100">{tx.title}</div>
                             {tx.description && (
-                              <p className="text-[11px] text-slate-400 font-normal truncate max-w-xs">{tx.description}</p>
+                              <p className="text-[11px] text-slate-400 font-normal truncate max-w-xs mt-0.5">{tx.description}</p>
                             )}
                           </td>
-                          <td className="p-4">
+
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            {tx.user?.name ? (
+                              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-300 bg-slate-900/90 px-2.5 py-1 rounded-lg border border-slate-800">
+                                <User className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                                {tx.user.name}
+                              </span>
+                            ) : (
+                              <span className="text-slate-500">-</span>
+                            )}
+                          </td>
+
+                          <td className="py-3.5 px-4 whitespace-nowrap">
                             {tx.type === "income" && (
-                              <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold">Receita</span>
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-semibold whitespace-nowrap">
+                                <ArrowUpRight className="w-3.5 h-3.5" /> Receita
+                              </span>
                             )}
                             {tx.type === "fixed_expense" && (
-                              <span className="px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-400 border border-purple-500/20 font-semibold">Despesa Fixa</span>
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-500/10 text-purple-400 border border-purple-500/20 text-xs font-semibold whitespace-nowrap">
+                                <ArrowDownRight className="w-3.5 h-3.5" /> Despesa Fixa
+                              </span>
                             )}
                             {tx.type === "variable_expense" && (
-                              <span className="px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/20 font-semibold">Gasto Variável</span>
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20 text-xs font-semibold whitespace-nowrap">
+                                <ArrowDownRight className="w-3.5 h-3.5" /> Gasto Variável
+                              </span>
                             )}
                           </td>
-                          <td className="p-4 text-slate-300">
+
+                          <td className="py-3.5 px-4 text-slate-300 whitespace-nowrap">
                             {tx.category ? (
-                              <span className="flex items-center gap-1.5">
-                                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: tx.category.color }} />
-                                {tx.category.name}
+                              <span className="inline-flex items-center gap-1.5">
+                                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: tx.category.color }} />
+                                <span className="font-medium">{tx.category.name}</span>
                               </span>
-                            ) : "-"}
+                            ) : (
+                              <span className="text-slate-500">-</span>
+                            )}
                           </td>
-                          <td className="p-4 text-slate-300">
-                            {tx.account?.name || "-"}
+
+                          <td className="py-3.5 px-4 text-slate-300 whitespace-nowrap font-medium">
+                            {tx.account?.name ? (
+                              <span className="flex items-center gap-1.5">
+                                <Wallet className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                {tx.account.name}
+                              </span>
+                            ) : (
+                              <span className="text-slate-500">-</span>
+                            )}
                           </td>
-                          <td className="p-4 text-slate-300 font-medium">
-                            {formatDate(tx.due_date)}
+
+                          <td className="py-3.5 px-4 text-slate-300 font-medium whitespace-nowrap">
+                            <span className="flex items-center gap-1.5">
+                              <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                              {formatDate(tx.due_date)}
+                            </span>
                           </td>
-                          <td className={`p-4 font-bold ${isIncome ? "text-emerald-400" : "text-slate-100"}`}>
-                            {isIncome ? "+" : "-"}{formatMoney(Number(tx.amount))}
+
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            <span className={`font-bold text-sm ${isIncome ? "text-emerald-400" : "text-slate-100"}`}>
+                              {isIncome ? "+" : "-"}{formatMoney(Number(tx.amount))}
+                            </span>
                           </td>
-                          <td className="p-4">
+
+                          <td className="py-3.5 px-4 whitespace-nowrap">
                             <button
                               onClick={() => handleToggleStatus(tx.id, tx.status)}
-                              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${
+                              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all shadow-sm ${
                                 isPaid
-                                  ? "bg-emerald-950/80 border border-emerald-800 text-emerald-300 hover:bg-emerald-900/80"
-                                  : "bg-amber-950/80 border border-amber-800 text-amber-300 hover:bg-amber-900/80"
+                                  ? "bg-emerald-950/80 border border-emerald-800/80 text-emerald-300 hover:bg-emerald-900/80"
+                                  : "bg-amber-950/80 border border-amber-800/80 text-amber-300 hover:bg-amber-900/80"
                               }`}
                             >
-                              {isPaid ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
-                              {isPaid ? "Pago" : "Pendente"}
+                              {isPaid ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Clock className="w-3.5 h-3.5" />}
+                              <span>{isPaid ? "Pago" : "Pendente"}</span>
                             </button>
                           </td>
-                          <td className="p-4 text-right">
+
+                          <td className="py-3.5 px-4 text-right whitespace-nowrap">
                             <div className="flex items-center justify-end gap-1">
                               <button
                                 onClick={() => openEditModal(tx)}

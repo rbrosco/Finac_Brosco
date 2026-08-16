@@ -8,6 +8,7 @@ import { Account } from "@/lib/db/entities/Account";
 import { Transaction, TransactionStatus, TransactionFrequency } from "@/lib/db/entities/Transaction";
 import { IntegrationConfig } from "@/lib/db/entities/IntegrationConfig";
 import { sendWhatsAppMessage, parseNaturalLanguageTransaction } from "@/lib/services/evolution";
+import { IsNull } from "typeorm";
 
 export async function POST(req: NextRequest) {
   try {
@@ -109,7 +110,7 @@ export async function POST(req: NextRequest) {
     let category = await categoryRepo.findOne({
       where: [
         { user_id: user.id, name: parsed.categoryHint },
-        { is_default: true, name: parsed.categoryHint }
+        { is_default: true, user_id: IsNull(), name: parsed.categoryHint }
       ]
     });
 

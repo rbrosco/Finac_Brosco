@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth";
 import { getDataSource } from "@/lib/db/data-source";
 import { Transaction, TransactionType, TransactionStatus } from "@/lib/db/entities/Transaction";
+import { IsNull } from "typeorm";
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,8 +20,8 @@ export async function POST(req: NextRequest) {
     // Find all master recurring items or fixed expenses of the user
     const recurringTemplates = await transactionRepo.find({
       where: [
-        { user_id: user.id, is_recurring: true, parent_transaction_id: null as unknown as string },
-        { user_id: user.id, type: TransactionType.FIXED_EXPENSE, parent_transaction_id: null as unknown as string }
+        { user_id: user.id, is_recurring: true, parent_transaction_id: IsNull() },
+        { user_id: user.id, type: TransactionType.FIXED_EXPENSE, parent_transaction_id: IsNull() }
       ]
     });
 

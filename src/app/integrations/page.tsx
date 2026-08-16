@@ -47,6 +47,13 @@ export default function IntegrationsPage() {
   const [notifyOnCreated, setNotifyOnCreated] = useState(true);
   const [notifyOnDue, setNotifyOnDue] = useState(true);
 
+  // AI Agent Fields
+  const [aiProvider, setAiProvider] = useState("openai");
+  const [aiApiKey, setAiApiKey] = useState("");
+  const [aiModel, setAiModel] = useState("gpt-4o-mini");
+  const [aiPrompt, setAiPrompt] = useState("Você é um assistente financeiro pessoal...");
+  const [isAiEnabled, setIsAiEnabled] = useState(true);
+
   const loadUserData = useCallback(async () => {
     try {
       const res = await fetch("/api/auth/me");
@@ -77,6 +84,11 @@ export default function IntegrationsPage() {
         setIsN8nEnabled(data.is_n8n_enabled ?? true);
         setNotifyOnCreated(data.notify_on_created ?? true);
         setNotifyOnDue(data.notify_on_due ?? true);
+        setAiProvider(data.ai_provider || "openai");
+        setAiApiKey(data.ai_api_key || "");
+        setAiModel(data.ai_model || "gpt-4o-mini");
+        if (data.ai_prompt_instructions) setAiPrompt(data.ai_prompt_instructions);
+        setIsAiEnabled(data.is_ai_enabled ?? true);
       }
     } catch (err) {
       console.error(err);
@@ -107,6 +119,11 @@ export default function IntegrationsPage() {
         is_n8n_enabled: isN8nEnabled,
         notify_on_created: notifyOnCreated,
         notify_on_due: notifyOnDue,
+        ai_provider: aiProvider,
+        ai_api_key: aiApiKey,
+        ai_model: aiModel,
+        ai_prompt_instructions: aiPrompt,
+        is_ai_enabled: isAiEnabled,
       };
 
       const res = await fetch("/api/integrations", {

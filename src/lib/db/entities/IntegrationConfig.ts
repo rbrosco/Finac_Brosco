@@ -40,6 +40,24 @@ export class IntegrationConfig {
   @Column({ type: "boolean", default: true })
   notify_on_due!: boolean;
 
+  @Column({ type: "varchar", length: 50, default: "openai" })
+  ai_provider!: string;
+
+  @Column({ type: "varchar", length: 255, default: "https://api.openai.com/v1" })
+  ai_base_url!: string;
+
+  @Column({ type: "varchar", length: 255, nullable: true })
+  ai_api_key!: string | null;
+
+  @Column({ type: "varchar", length: 100, default: "gpt-4o-mini" })
+  ai_model!: string;
+
+  @Column({ type: "text", nullable: true })
+  ai_prompt_instructions!: string | null;
+
+  @Column({ type: "boolean", default: true })
+  is_ai_enabled!: boolean;
+
   @CreateDateColumn()
   created_at!: Date;
 

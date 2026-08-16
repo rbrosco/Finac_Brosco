@@ -12,7 +12,9 @@ import {
   LogOut,
   TrendingUp,
   ShieldCheck,
-  Zap
+  Zap,
+  Users,
+  Bot
 } from "lucide-react";
 
 interface SidebarProps {
@@ -36,9 +38,11 @@ export default function Sidebar({ user }: SidebarProps) {
   const navItems = [
     { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { label: "Transações", href: "/transactions", icon: Receipt },
+    { label: "Agente IA", href: "/agent", icon: Bot },
     { label: "Categorias", href: "/categories", icon: Tags },
     { label: "Contas & Cartões", href: "/accounts", icon: Wallet },
     { label: "Relatórios", href: "/reports", icon: BarChart3 },
+    { label: "Controle Familiar", href: "/family", icon: Users },
     { label: "Integrações", href: "/integrations", icon: Zap },
     { label: "Configurações", href: "/settings", icon: Settings },
   ];

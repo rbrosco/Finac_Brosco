@@ -62,6 +62,13 @@ export async function POST(req: NextRequest) {
     if (body.notify_on_created !== undefined) config.notify_on_created = Boolean(body.notify_on_created);
     if (body.notify_on_due !== undefined) config.notify_on_due = Boolean(body.notify_on_due);
 
+    if (body.ai_provider !== undefined) config.ai_provider = body.ai_provider.trim();
+    if (body.ai_base_url !== undefined) config.ai_base_url = body.ai_base_url.trim();
+    if (body.ai_api_key !== undefined) config.ai_api_key = body.ai_api_key ? body.ai_api_key.trim() : null;
+    if (body.ai_model !== undefined) config.ai_model = body.ai_model.trim();
+    if (body.ai_prompt_instructions !== undefined) config.ai_prompt_instructions = body.ai_prompt_instructions ? body.ai_prompt_instructions.trim() : null;
+    if (body.is_ai_enabled !== undefined) config.is_ai_enabled = Boolean(body.is_ai_enabled);
+
     await configRepo.save(config);
     return NextResponse.json(config);
   } catch (error) {

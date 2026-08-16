@@ -8,6 +8,7 @@ import { Account } from "@/lib/db/entities/Account";
 import { Transaction, TransactionType, TransactionStatus, TransactionFrequency } from "@/lib/db/entities/Transaction";
 import { IntegrationConfig } from "@/lib/db/entities/IntegrationConfig";
 import { sendWhatsAppMessage } from "@/lib/services/evolution";
+import { IsNull } from "typeorm";
 
 export async function POST(req: NextRequest) {
   try {
@@ -93,7 +94,7 @@ export async function POST(req: NextRequest) {
       category = await categoryRepo.findOne({
         where: [
           { user_id: user.id, name: categoryName },
-          { is_default: true, name: categoryName }
+          { is_default: true, user_id: IsNull(), name: categoryName }
         ]
       });
     }

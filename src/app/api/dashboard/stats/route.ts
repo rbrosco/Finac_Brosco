@@ -4,11 +4,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth";
 import { getDataSource } from "@/lib/db/data-source";
 import { Transaction, TransactionType, TransactionStatus } from "@/lib/db/entities/Transaction";
+import { getFamilyUserIds } from "@/lib/db/family-helper";
 
 export async function GET(req: NextRequest) {
   try {
     const user = await getAuthUser(req);
     if (!user) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+
+    const userIds = await getFamilyUserIds(user.id);
 
     const { searchParams } = new URL(req.url);
     const now = new Date();
@@ -30,7 +33,8 @@ export async function GET(req: NextRequest) {
       .createQueryBuilder("t")
       .leftJoinAndSelect("t.category", "category")
       .leftJoinAndSelect("t.account", "account")
-      .where("t.user_id = :userId", { userId: user.id })
+      .leftJoinAndSelect("t.user", "user")
+      .where("t.user_id IN (:...userIds)", { userIds })
       .andWhere("t.due_date >= :startDate AND t.due_date <= :endDate", { startDate, endDate })
       .orderBy("t.due_date", "DESC")
       .getMany();
@@ -92,7 +96,7 @@ export async function GET(req: NextRequest) {
 
       const tList = await transactionRepo
         .createQueryBuilder("t")
-        .where("t.user_id = :userId", { userId: user.id })
+        .where("t.user_id IN (:...userIds)", { userIds })
         .andWhere("t.due_date >= :mStart AND t.due_date <= :mEnd", { mStart, mEnd })
         .getMany();
 

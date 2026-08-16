@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth";
 import { getDataSource } from "@/lib/db/data-source";
 import { Category, CategoryType } from "@/lib/db/entities/Category";
+import { IsNull, In } from "typeorm";
+import { getFamilyUserIds } from "@/lib/db/family-helper";
 
 export async function GET(req: NextRequest) {
   try {
@@ -11,13 +13,31 @@ export async function GET(req: NextRequest) {
     const dataSource = await getDataSource();
     const categoryRepo = dataSource.getRepository(Category);
 
-    const categories = await categoryRepo.find({
+    const userIds = await getFamilyUserIds(user.id);
+
+    const rawCategories = await categoryRepo.find({
       where: [
-        { user_id: user.id },
-        { is_default: true, user_id: null as unknown as string }
+        { user_id: In(userIds) },
+        { is_default: true, user_id: IsNull() }
       ],
       order: { type: "ASC", name: "ASC" }
     });
+
+    // Deduplicate categories by name & type for family members so default categories do not repeat
+    const categoryMap = new Map<string, typeof rawCategories[0]>();
+    for (const cat of rawCategories) {
+      const key = `${cat.type}:${cat.name.toLowerCase().trim()}`;
+      if (!categoryMap.has(key)) {
+        categoryMap.set(key, cat);
+      } else {
+        const existing = categoryMap.get(key)!;
+        if (cat.user_id === user.id || (!cat.is_default && existing.is_default)) {
+          categoryMap.set(key, cat);
+        }
+      }
+    }
+
+    const categories = Array.from(categoryMap.values());
 
     return NextResponse.json(categories);
   } catch (error) {

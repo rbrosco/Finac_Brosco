@@ -9,7 +9,8 @@ import {
   MoreVertical,
   Calendar,
   Tag,
-  Wallet
+  Wallet,
+  User
 } from "lucide-react";
 import Link from "next/link";
 
@@ -22,6 +23,7 @@ interface TransactionItem {
   status: "paid" | "pending";
   category?: { name: string; color: string; icon: string } | null;
   account?: { name: string } | null;
+  user?: { name: string; email?: string } | null;
 }
 
 interface RecentTransactionsProps {
@@ -99,6 +101,12 @@ export default function RecentTransactions({ transactions, onToggleStatus }: Rec
                     <div className="flex items-center gap-2 flex-wrap">
                       <h4 className="font-semibold text-slate-200 text-sm">{tx.title}</h4>
                       {getTypeBadge(tx.type)}
+                      {tx.user?.name && (
+                        <span className="flex items-center gap-1 text-[11px] font-semibold text-indigo-300 bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20">
+                          <User className="w-3 h-3 text-indigo-400" />
+                          {tx.user.name}
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-3 text-xs text-slate-400 flex-wrap">
                       {tx.category && (

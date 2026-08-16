@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth";
 import { getDataSource } from "@/lib/db/data-source";
 import { Transaction, TransactionType, TransactionStatus, TransactionFrequency } from "@/lib/db/entities/Transaction";
+import { getFamilyUserIds } from "@/lib/db/family-helper";
 
 export async function GET(req: NextRequest) {
   try {
@@ -17,12 +18,15 @@ export async function GET(req: NextRequest) {
     const category_id = searchParams.get("category_id");
     const account_id = searchParams.get("account_id");
 
+    const userIds = await getFamilyUserIds(user.id);
+
     const dataSource = await getDataSource();
     const query = dataSource.getRepository(Transaction)
       .createQueryBuilder("t")
       .leftJoinAndSelect("t.category", "category")
       .leftJoinAndSelect("t.account", "account")
-      .where("t.user_id = :userId", { userId: user.id });
+      .leftJoinAndSelect("t.user", "user")
+      .where("t.user_id IN (:...userIds)", { userIds });
 
     if (type) {
       query.andWhere("t.type = :type", { type });

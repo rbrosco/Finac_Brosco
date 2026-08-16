@@ -6,6 +6,8 @@ import { Account } from "./entities/Account";
 import { Transaction } from "./entities/Transaction";
 import { PasswordResetToken } from "./entities/PasswordResetToken";
 import { IntegrationConfig } from "./entities/IntegrationConfig";
+import { Family } from "./entities/Family";
+import { FamilyMember } from "./entities/FamilyMember";
 
 const host = process.env.POSTGRES_HOST || "localhost";
 const port = parseInt(process.env.POSTGRES_PORT || "5432", 10);
@@ -13,7 +15,7 @@ const username = process.env.POSTGRES_USER || "postgres";
 const password = process.env.POSTGRES_PASSWORD || "F2Wgk8qLrT7mXvYpQ9nCz3d";
 const database = process.env.POSTGRES_DB || "finac-db";
 
-const entities = [User, Category, Account, Transaction, PasswordResetToken, IntegrationConfig];
+const entities = [User, Category, Account, Transaction, PasswordResetToken, IntegrationConfig, Family, FamilyMember];
 
 declare global {
   // eslint-disable-next-line no-var
