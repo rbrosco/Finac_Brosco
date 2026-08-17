@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/layout/Sidebar";
+import BottomNav from "@/components/layout/BottomNav";
 import Header from "@/components/layout/Header";
 import { BarChart3, Download, PieChart, TrendingUp, Calendar, ArrowUpRight, ArrowDownRight, Loader2 } from "lucide-react";
 
@@ -101,7 +102,7 @@ export default function ReportsPage() {
           user={user}
         />
 
-        <main className="flex-1 p-4 md:p-8 space-y-6 max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-4 md:p-6 space-y-6 w-full">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h1 className="text-2xl font-extrabold text-white tracking-tight flex items-center gap-2">
@@ -208,6 +209,7 @@ export default function ReportsPage() {
           ) : null}
         </main>
       </div>
+      <BottomNav user={user} />
     </div>
   );
 }

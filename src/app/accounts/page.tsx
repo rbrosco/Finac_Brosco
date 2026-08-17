@@ -3,8 +3,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/layout/Sidebar";
+import BottomNav from "@/components/layout/BottomNav";
 import Header from "@/components/layout/Header";
 import AccountModal from "@/components/accounts/AccountModal";
+import ConfirmDeleteModal from "@/components/common/ConfirmDeleteModal";
 import { Wallet, Plus, CreditCard, Landmark, Coins, Edit2, Trash2, Loader2 } from "lucide-react";
 
 export default function AccountsPage() {
@@ -20,6 +22,7 @@ export default function AccountsPage() {
   // Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<any>(null);
+  const [deletingAccount, setDeletingAccount] = useState<any>(null);
 
   const loadUserData = useCallback(async () => {
     try {
@@ -52,10 +55,10 @@ export default function AccountsPage() {
     loadAccounts();
   }, [loadUserData, loadAccounts]);
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Tem certeza que deseja excluir esta conta?")) return;
+  const handleConfirmDelete = async () => {
+    if (!deletingAccount) return;
     try {
-      const res = await fetch(`/api/accounts/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/accounts/${deletingAccount.id}`, { method: "DELETE" });
       if (res.ok) loadAccounts();
     } catch (err) {
       console.error(err);
@@ -112,7 +115,7 @@ export default function AccountsPage() {
           user={user}
         />
 
-        <main className="flex-1 p-4 md:p-8 space-y-6 max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-4 md:p-6 space-y-6 w-full">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h1 className="text-2xl font-extrabold text-white tracking-tight flex items-center gap-2">
@@ -167,7 +170,7 @@ export default function AccountsPage() {
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => handleDelete(acc.id)}
+                        onClick={() => setDeletingAccount(acc)}
                         className="p-1.5 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-rose-500/10"
                         title="Excluir"
                       >
@@ -193,6 +196,18 @@ export default function AccountsPage() {
         onSuccess={loadAccounts}
         initialData={editingAccount}
       />
+
+      <ConfirmDeleteModal
+        isOpen={Boolean(deletingAccount)}
+        onClose={() => setDeletingAccount(null)}
+        onConfirm={handleConfirmDelete}
+        title="Excluir Conta Financeira"
+        description="Tem certeza que deseja excluir esta conta bancária ou cartão?"
+        itemName={deletingAccount?.name}
+        itemDetails={deletingAccount ? `Saldo Inicial: ${formatMoney(Number(deletingAccount.initial_balance))}` : undefined}
+      />
+
+      <BottomNav user={user} />
     </div>
   );
 }

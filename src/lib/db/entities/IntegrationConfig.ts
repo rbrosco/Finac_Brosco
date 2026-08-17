@@ -22,6 +22,12 @@ export class IntegrationConfig {
   @Column({ type: "varchar", length: 50, nullable: true })
   whatsapp_number!: string | null;
 
+  @Column({ type: "varchar", length: 50, default: "finac" })
+  evolution_keyword!: string;
+
+  @Column({ type: "boolean", default: true })
+  require_keyword!: boolean;
+
   @Column({ type: "varchar", length: 255, nullable: true })
   n8n_webhook_url!: string | null;
 

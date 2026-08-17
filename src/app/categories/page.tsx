@@ -3,8 +3,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/layout/Sidebar";
+import BottomNav from "@/components/layout/BottomNav";
 import Header from "@/components/layout/Header";
 import CategoryModal from "@/components/categories/CategoryModal";
+import ConfirmDeleteModal from "@/components/common/ConfirmDeleteModal";
 import { Tags, Plus, Edit2, Trash2, Loader2, ArrowUpRight, ArrowDownRight } from "lucide-react";
 
 export default function CategoriesPage() {
@@ -20,6 +22,7 @@ export default function CategoriesPage() {
   // Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<any>(null);
+  const [deletingCategory, setDeletingCategory] = useState<any>(null);
 
   const loadUserData = useCallback(async () => {
     try {
@@ -52,10 +55,10 @@ export default function CategoriesPage() {
     loadCategories();
   }, [loadUserData, loadCategories]);
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Tem certeza que deseja excluir esta categoria?")) return;
+  const handleConfirmDelete = async () => {
+    if (!deletingCategory) return;
     try {
-      const res = await fetch(`/api/categories/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/categories/${deletingCategory.id}`, { method: "DELETE" });
       if (res.ok) loadCategories();
       else alert("Categorias padrão não podem ser removidas.");
     } catch (err) {
@@ -88,7 +91,7 @@ export default function CategoriesPage() {
           user={user}
         />
 
-        <main className="flex-1 p-4 md:p-8 space-y-6 max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-4 md:p-6 space-y-6 w-full">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h1 className="text-2xl font-extrabold text-white tracking-tight flex items-center gap-2">
@@ -149,7 +152,7 @@ export default function CategoriesPage() {
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
                           <button
-                            onClick={() => handleDelete(cat.id)}
+                            onClick={() => setDeletingCategory(cat)}
                             className="p-1.5 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-rose-500/10"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -196,7 +199,7 @@ export default function CategoriesPage() {
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
                           <button
-                            onClick={() => handleDelete(cat.id)}
+                            onClick={() => setDeletingCategory(cat)}
                             className="p-1.5 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-rose-500/10"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -218,6 +221,17 @@ export default function CategoriesPage() {
         onSuccess={loadCategories}
         initialData={editingCategory}
       />
+
+      <ConfirmDeleteModal
+        isOpen={Boolean(deletingCategory)}
+        onClose={() => setDeletingCategory(null)}
+        onConfirm={handleConfirmDelete}
+        title="Excluir Categoria"
+        description="Tem certeza que deseja excluir esta categoria personalizada?"
+        itemName={deletingCategory?.name}
+      />
+
+      <BottomNav user={user} />
     </div>
   );
 }

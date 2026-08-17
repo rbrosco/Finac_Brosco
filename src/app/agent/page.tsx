@@ -3,7 +3,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/layout/Sidebar";
+import BottomNav from "@/components/layout/BottomNav";
 import Header from "@/components/layout/Header";
+import HelpTooltip from "@/components/common/HelpTooltip";
+import ConfirmStatementImportModal from "@/components/common/ConfirmStatementImportModal";
 import {
   Bot,
   Sparkles,
@@ -11,6 +14,7 @@ import {
   FileText,
   CheckCircle2,
   Send,
+  Upload,
   FileSpreadsheet,
   ScanLine,
   Check,
@@ -54,12 +58,18 @@ export default function AgentPage() {
   const [recType, setRecType] = useState<"income" | "fixed_expense" | "variable_expense">("variable_expense");
   const [recCategory, setRecCategory] = useState("");
   const [recAccount, setRecAccount] = useState("");
+  const [recUser, setRecUser] = useState("");
   const [recDueDate, setRecDueDate] = useState(new Date().toISOString().split("T")[0]);
+  const [familyMembers, setFamilyMembers] = useState<any[]>([]);
 
   // Tab 2: Statement State
   const [statementText, setStatementText] = useState("");
+  const [statementFile, setStatementFile] = useState<File | null>(null);
+  const [statementPreviewUrl, setStatementPreviewUrl] = useState("");
+  const [statementAccount, setStatementAccount] = useState("");
   const [isAnalyzingStatement, setIsAnalyzingStatement] = useState(false);
   const [statementItems, setStatementItems] = useState<any[]>([]);
+  const [isConfirmStatementModalOpen, setIsConfirmStatementModalOpen] = useState(false);
 
   // Tab 3: Chat State
   const [chatMessages, setChatMessages] = useState<any[]>([
@@ -95,12 +105,22 @@ export default function AgentPage() {
   const loadCategoriesAndAccounts = useCallback(async () => {
     try {
       setLoading(true);
-      const [catRes, accRes] = await Promise.all([
+      const [catRes, accRes, famRes] = await Promise.all([
         fetch("/api/categories"),
-        fetch("/api/accounts")
+        fetch("/api/accounts"),
+        fetch("/api/family")
       ]);
       if (catRes.ok) setCategories(await catRes.json());
       if (accRes.ok) setAccounts(await accRes.json());
+      if (famRes.ok) {
+        const famData = await famRes.json();
+        if (famData.members && Array.isArray(famData.members)) {
+          const membersList = famData.members
+            .filter((m: any) => m.user)
+            .map((m: any) => m.user);
+          setFamilyMembers(membersList);
+        }
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -144,12 +164,61 @@ export default function AgentPage() {
         setRecDueDate(resObj.due_date || new Date().toISOString().split("T")[0]);
         setRecCategory(resObj.category_id || (categories.length > 0 ? categories[0].id : ""));
         setRecAccount(resObj.account_id || (accounts.length > 0 ? accounts[0].id : ""));
+
+        // Auto-select detected family member or default to account owner / current user
+        if (resObj.user_id) {
+          setRecUser(resObj.user_id);
+        } else if (resObj.account_id) {
+          const acc = accounts.find((a: any) => a.id === resObj.account_id);
+          setRecUser(acc?.user_id || user?.id || "");
+        } else {
+          setRecUser(user?.id || "");
+        }
       }
     } catch {
       setErrorMsg("Erro de conexão ao analisar o comprovante.");
     } finally {
       setIsAnalyzingReceipt(false);
     }
+  };
+
+  // Local Tesseract OCR Engine (runs 100% offline in browser without AI key!)
+  const performLocalOcr = (dataUrl: string): Promise<string> => {
+    return new Promise((resolve) => {
+      try {
+        const scriptId = "tesseract-js-cdn";
+        let script = document.getElementById(scriptId) as HTMLScriptElement;
+
+        const doRecognize = async () => {
+          try {
+            if ((window as any).Tesseract) {
+              const worker = await (window as any).Tesseract.createWorker("por");
+              const ret = await worker.recognize(dataUrl);
+              await worker.terminate();
+              resolve(ret?.data?.text || "");
+            } else {
+              resolve("");
+            }
+          } catch (err) {
+            console.warn("Local OCR warning:", err);
+            resolve("");
+          }
+        };
+
+        if (!script) {
+          script = document.createElement("script");
+          script.id = scriptId;
+          script.src = "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
+          script.onload = doRecognize;
+          script.onerror = () => resolve("");
+          document.head.appendChild(script);
+        } else {
+          doRecognize();
+        }
+      } catch {
+        resolve("");
+      }
+    });
   };
 
   // Handle File Drag & Drop / Selection for Receipt
@@ -159,11 +228,18 @@ export default function AgentPage() {
     const reader = new FileReader();
 
     if (isImage) {
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
         const dataUrl = e.target?.result as string;
         setReceiptPreviewUrl(dataUrl);
-        setReceiptText(""); // Keep text area clean of binary garbage
-        handleAnalyzeReceipt("", file.name, dataUrl);
+        setIsAnalyzingReceipt(true);
+
+        // Run local Tesseract OCR on the image first (works 100% without AI key!)
+        const ocrText = await performLocalOcr(dataUrl);
+        if (ocrText.trim()) {
+          setReceiptText(ocrText.trim());
+        }
+
+        handleAnalyzeReceipt(ocrText.trim() || "", file.name, dataUrl);
       };
       reader.readAsDataURL(file);
     } else {
@@ -199,7 +275,9 @@ export default function AgentPage() {
             due_date: recDueDate,
             category_id: recCategory || null,
             account_id: recAccount || null,
-            status: "paid"
+            status: "paid",
+            description: analyzedReceipt?.extracted_text_summary || `Auditado via Agente IA: ${recTitle}`,
+            attachment_url: receiptPreviewUrl || null
           }]
         })
       });
@@ -220,11 +298,131 @@ export default function AgentPage() {
     }
   };
 
+  // Extract text from PDF files using PDF.js CDN grouping items by Y-position
+  const extractPdfText = async (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      try {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+          try {
+            const buffer = e.target?.result as ArrayBuffer;
+            if (!(window as any).pdfjsLib) {
+              const script = document.createElement("script");
+              script.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+              document.head.appendChild(script);
+              await new Promise((res) => { script.onload = res; script.onerror = res; });
+            }
+            const pdfjsLib = (window as any).pdfjsLib;
+            if (!pdfjsLib) {
+              resolve("");
+              return;
+            }
+            pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+            const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+            let fullText = "";
+
+            for (let i = 1; i <= pdf.numPages; i++) {
+              const page = await pdf.getPage(i);
+              const content = await page.getTextContent();
+
+              // Group items by Y coordinate (rounded to 3px tolerance)
+              const linesMap = new Map<number, { x: number; text: string }[]>();
+
+              for (const item of content.items as any[]) {
+                if (!item.str || !item.str.trim()) continue;
+                const rawY = item.transform ? item.transform[5] : 0;
+                const rawX = item.transform ? item.transform[4] : 0;
+
+                let keyY = Math.round(rawY);
+                for (const existingY of linesMap.keys()) {
+                  if (Math.abs(existingY - rawY) <= 3) {
+                    keyY = existingY;
+                    break;
+                  }
+                }
+
+                if (!linesMap.has(keyY)) {
+                  linesMap.set(keyY, []);
+                }
+                linesMap.get(keyY)!.push({ x: rawX, text: item.str.trim() });
+              }
+
+              // Sort Y coordinates descending (top of page to bottom)
+              const sortedY = Array.from(linesMap.keys()).sort((a, b) => b - a);
+
+              for (const y of sortedY) {
+                const itemsOnY = linesMap.get(y)!;
+                itemsOnY.sort((a, b) => a.x - b.x);
+                const lineStr = itemsOnY.map(it => it.text).join(" ");
+                fullText += lineStr + "\n";
+              }
+            }
+
+            resolve(fullText);
+          } catch (err) {
+            console.warn("PDF extract error:", err);
+            resolve("");
+          }
+        };
+        reader.readAsArrayBuffer(file);
+      } catch {
+        resolve("");
+      }
+    });
+  };
+
+  // Handle Statement File Upload (OFX / CSV / PDF / PNG / JPG)
+  const handleStatementFileUpload = async (file: File) => {
+    setStatementFile(file);
+    setIsAnalyzingStatement(true);
+    setErrorMsg("");
+    setSuccessMsg("");
+
+    const isPdf = file.type.includes("pdf") || file.name.toLowerCase().endsWith(".pdf");
+    const isImage = file.type.startsWith("image/") || file.name.match(/\.(png|jpe?g|webp)$/i);
+
+    if (isPdf) {
+      const pdfText = await extractPdfText(file);
+      if (pdfText && pdfText.trim().length > 10) {
+        setStatementText(pdfText.trim());
+        handleAnalyzeStatement(pdfText.trim(), file.name);
+      } else {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+          const dataUrl = e.target?.result as string;
+          const ocrText = await performLocalOcr(dataUrl);
+          if (ocrText.trim()) setStatementText(ocrText.trim());
+          handleAnalyzeStatement(ocrText.trim() || file.name, file.name);
+        };
+        reader.readAsDataURL(file);
+      }
+    } else if (isImage) {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const dataUrl = e.target?.result as string;
+        setStatementPreviewUrl(dataUrl);
+        const ocrText = await performLocalOcr(dataUrl);
+        if (ocrText.trim()) setStatementText(ocrText.trim());
+        handleAnalyzeStatement(ocrText.trim() || file.name, file.name);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const text = e.target?.result as string;
+        setStatementPreviewUrl("");
+        setStatementText(text || file.name);
+        handleAnalyzeStatement(text || file.name, file.name);
+      };
+      reader.readAsText(file);
+    }
+  };
+
   // Handle Statement File / Text Analysis
   const handleAnalyzeStatement = async (contentStr?: string, filename?: string) => {
-    const textToAnalyze = contentStr || statementText;
+    const textToAnalyze = contentStr !== undefined ? contentStr : statementText;
     if (!textToAnalyze.trim()) {
-      setErrorMsg("Insira ou cole o conteúdo do extrato bancário (OFX, CSV ou texto).");
+      setErrorMsg("Carregue um arquivo de extrato (OFX, CSV, PDF ou Foto) ou cole o texto do extrato.");
       return;
     }
 
@@ -238,7 +436,7 @@ export default function AgentPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           content: textToAnalyze,
-          fileName: filename || "extrato.ofx"
+          fileName: filename || statementFile?.name || "extrato.ofx"
         })
       });
 
@@ -249,6 +447,10 @@ export default function AgentPage() {
         setStatementItems(data.items || []);
         if ((data.items || []).length === 0) {
           setErrorMsg("Nenhum lançamento legível foi encontrado no extrato.");
+        } else if (data.duplicate_count > 0) {
+          setSuccessMsg(`Extrato lido! ${data.new_count || 0} lançamentos novos identificados. ${data.duplicate_count} lançamentos já existentes foram desmarcados para evitar duplicidades.`);
+        } else {
+          setSuccessMsg(`Extrato lido com sucesso! ${data.count} lançamentos prontos para importação.`);
         }
       }
     } catch {
@@ -258,35 +460,50 @@ export default function AgentPage() {
     }
   };
 
-  // Save Selected Statement Items
-  const handleSaveStatementBatch = async () => {
+  // Open Confirmation Popup Modal for Statement Batch
+  const handleSaveStatementBatch = () => {
     const selected = statementItems.filter(i => i.selected);
     if (selected.length === 0) {
       setErrorMsg("Selecione pelo menos uma transação para importar.");
       return;
     }
+    setIsConfirmStatementModalOpen(true);
+  };
+
+  // Execute Actual Database Insertion after User Accepts Terms in Modal
+  const handleExecuteSaveStatementBatch = async () => {
+    const selected = statementItems.filter(i => i.selected);
+    if (selected.length === 0) return;
 
     try {
       setIsSaving(true);
       setErrorMsg("");
 
+      const itemsToSave = selected.map(item => ({
+        ...item,
+        account_id: item.account_id || statementAccount || (accounts[0]?.id || null)
+      }));
+
       const res = await fetch("/api/agent/confirm-batch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: selected })
+        body: JSON.stringify({ items: itemsToSave })
       });
 
       const data = await res.json();
 
       if (res.ok) {
-        setSuccessMsg(`${data.count || selected.length} transações importadas do extrato com sucesso!`);
+        const skippedMsg = data.skipped_duplicates > 0 ? ` (${data.skipped_duplicates} duplicados ignorados pelo banco)` : "";
+        setSuccessMsg(`${data.count || selected.length} transações salvas com sucesso no seu extrato!${skippedMsg}`);
         setStatementItems([]);
         setStatementText("");
+        setStatementFile(null);
+        setIsConfirmStatementModalOpen(false);
       } else {
         setErrorMsg(data.error || "Erro ao importar transações.");
       }
     } catch {
-      setErrorMsg("Erro de conexão ao importar transações.");
+      setErrorMsg("Erro ao salvar transações do extrato.");
     } finally {
       setIsSaving(false);
     }
@@ -301,13 +518,13 @@ export default function AgentPage() {
     setStatementItems(prev => prev.map(item => ({ ...item, selected })));
   };
 
-  // Chat Submission
-  const handleSendChatMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!chatInput.trim()) return;
+  const toggleSelectOnlyNewStatements = () => {
+    setStatementItems(prev => prev.map(item => ({ ...item, selected: !item.already_exists })));
+  };
 
-    const userText = chatInput.trim();
-    setChatInput("");
+  // Chat Submission
+  const sendDirectMessage = async (userText: string) => {
+    if (!userText.trim()) return;
 
     const newMsg = {
       id: `user-${Date.now()}`,
@@ -320,21 +537,20 @@ export default function AgentPage() {
 
     try {
       setIsChatThinking(true);
-      const res = await fetch("/api/agent/analyze-receipt", {
+      const res = await fetch("/api/agent/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: userText, fileName: "chat.txt" })
+        body: JSON.stringify({ message: userText })
       });
 
       const data = await res.json();
-      if (res.ok && data.result) {
-        const r = data.result;
+      if (res.ok && data.reply) {
         const agentReply = {
           id: `agent-${Date.now()}`,
           sender: "agent",
-          text: `Entendi! Encontrei um lançamento: *${r.title}* no valor de *R$ ${r.amount.toFixed(2)}*. Quer que eu insira no sistema agora?`,
+          text: data.reply,
           timestamp: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-          proposal: r
+          proposal: data.proposal
         };
         setChatMessages(prev => [...prev, agentReply]);
       } else {
@@ -355,6 +571,14 @@ export default function AgentPage() {
     } finally {
       setIsChatThinking(false);
     }
+  };
+
+  const handleSendChatMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatInput.trim()) return;
+    const userText = chatInput.trim();
+    setChatInput("");
+    await sendDirectMessage(userText);
   };
 
   // Confirm Chat Proposal
@@ -389,7 +613,7 @@ export default function AgentPage() {
           user={user}
         />
 
-        <main className="flex-1 p-4 md:p-8 space-y-6 max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-4 md:p-6 space-y-6 w-full">
           {/* Header Title */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
@@ -462,6 +686,12 @@ export default function AgentPage() {
                 <div>
                   <h3 className="font-bold text-base text-white flex items-center gap-2 mb-1">
                     <UploadCloud className="w-5 h-5 text-brand-400" /> Anexar Comprovante ou Nota Fiscal
+                    <HelpTooltip
+                      id="agent_receipt_ocr_help"
+                      title="Leitor de Comprovantes (OCR / IA)"
+                      description="Envie uma imagem de um comprovante de pagamento PIX ou cupom fiscal. O Agente IA extrai os valores e sugere a categoria ideal."
+                      actionHint="Arraste uma foto JPG/PNG/PDF ou cole o texto do comprovante."
+                    />
                   </h3>
                   <p className="text-xs text-slate-400 leading-relaxed">
                     Envie a foto do comprovante PIX, nota fiscal, recibo ou cole o texto legível.
@@ -566,13 +796,23 @@ export default function AgentPage() {
                       </div>
 
                       {/* Vision API Key Tip Banner if amount === 0 */}
-                      {analyzedReceipt.amount === 0 && (
+                      {analyzedReceipt.amount === 0 ? (
                         <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-[11px] text-amber-300 flex items-start gap-2">
                           <Sparkles className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                           <div className="space-y-1">
-                            <p className="font-bold text-amber-200">Visão Computacional por IA:</p>
+                            <p className="font-bold text-amber-200">Opções de Leitura de Imagem (Sem IA / Com IA / n8n):</p>
                             <p className="leading-relaxed">
-                              Para que a IA leia e extraia o valor automaticamente dentro da foto do comprovante, certifique-se de preencher sua <strong>Chave de API (OpenAI / Gemini / Groq)</strong> ou habilitar o <strong>LM Studio</strong> na página de <a href="/settings" className="underline font-bold text-amber-200 hover:text-white">Configurações</a>.
+                              O sistema executa <strong>OCR Local no navegador sem necessidade de IA</strong>. Se o texto do cupom estiver borrado, você pode ativar uma <strong>Chave de API (OpenAI/Gemini/Groq)</strong> ou o <strong>Webhook n8n</strong> na página de <a href="/settings" className="underline font-bold text-amber-200 hover:text-white">Configurações</a>.
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-[11px] text-emerald-300 flex items-start gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                          <div className="space-y-1">
+                            <p className="font-bold text-emerald-200">Leitura de Comprovante Concluída:</p>
+                            <p className="leading-relaxed">
+                              Dados lidos com sucesso via OCR Local/IA. Confira os campos abaixo e clique em confirmar.
                             </p>
                           </div>
                         </div>
@@ -640,61 +880,157 @@ export default function AgentPage() {
                           </div>
                         </div>
 
-                        <div>
-                          <label className="block text-[11px] font-semibold text-slate-400 mb-1">Conta Financeira</label>
-                          <select
-                            value={recAccount}
-                            onChange={(e) => setRecAccount(e.target.value)}
-                            className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white focus:outline-none"
-                          >
-                            {accounts.map((a) => (
-                              <option key={a.id} value={a.id}>{a.name}</option>
-                            ))}
-                          </select>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-400 mb-1">Conta Financeira</label>
+                            <select
+                              value={recAccount}
+                              onChange={(e) => {
+                                const accId = e.target.value;
+                                setRecAccount(accId);
+                                const acc = accounts.find((a: any) => a.id === accId);
+                                if (acc && acc.user_id) setRecUser(acc.user_id);
+                              }}
+                              className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white focus:outline-none"
+                            >
+                              {accounts.map((a) => (
+                                <option key={a.id} value={a.id}>{a.name}</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-semibold text-indigo-400 mb-1">👤 Membro Responsável (Família)</label>
+                            <select
+                              value={recUser}
+                              onChange={(e) => setRecUser(e.target.value)}
+                              className="w-full px-3 py-2 bg-slate-900 border border-indigo-500/50 rounded-lg text-xs text-white focus:outline-none focus:border-indigo-400 font-semibold"
+                            >
+                              {familyMembers && familyMembers.length > 0 ? (
+                                familyMembers.map((m: any) => (
+                                  <option key={m.id} value={m.id}>
+                                    {m.name} {m.id === user?.id ? "(Você)" : ""}
+                                  </option>
+                                ))
+                              ) : (
+                                <option value={user?.id || ""}>{user?.name || "Você"}</option>
+                              )}
+                            </select>
                         </div>
                       </div>
+
+                      <button
+                        onClick={handleSaveReceipt}
+                        disabled={isSaving}
+                        className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-600/30 mt-4"
+                      >
+                        {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                        Confirmar & Lançar no Sistema
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+          {/* TAB 2: STATEMENT PARSER (OFX / CSV / PDF / IMAGES) */}
+          {activeTab === "statement" && (
+            <div className="space-y-6">
+              <div className="glass-card p-6 rounded-2xl border border-slate-800 space-y-5">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <h3 className="font-bold text-base text-white flex items-center gap-2">
+                    <FileSpreadsheet className="w-5 h-5 text-purple-400" /> Importar Extrato Bancário (OFX / CSV / PDF / Foto)
+                    <HelpTooltip
+                      id="agent_statement_help"
+                      title="Importador de Extratos Bancários"
+                      description="Carregue arquivos de extrato (OFX, CSV, PDF ou imagens/prints) para que o Agente IA processe todas as movimentações em lote."
+                      actionHint="Arraste o arquivo ou cole o texto do extrato e clique em 'Processar Extrato'."
+                    />
+                  </h3>
+                </div>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Envie a foto/print do extrato ou arquivo (<span className="text-purple-300 font-semibold">OFX, CSV, PDF, TXT</span>) para que o Agente IA leia e estruture os lançamentos automaticamente em lote.
+                </p>
+
+                {/* Drag & Drop File Zone for Statements */}
+                <div
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                      handleStatementFileUpload(e.dataTransfer.files[0]);
+                    }
+                  }}
+                  className="border-2 border-dashed border-purple-500/30 hover:border-purple-500/60 bg-purple-500/5 hover:bg-purple-500/10 rounded-2xl p-6 text-center transition-all cursor-pointer space-y-3"
+                >
+                  <input
+                    type="file"
+                    id="statementFileInput"
+                    accept=".ofx,.csv,.pdf,.png,.jpg,.jpeg,.txt"
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        handleStatementFileUpload(e.target.files[0]);
+                      }
+                    }}
+                  />
+                  <label htmlFor="statementFileInput" className="cursor-pointer space-y-2 block">
+                    <div className="w-12 h-12 rounded-2xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center mx-auto text-purple-400">
+                      <Upload className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-slate-200">
+                        Clique ou arraste aqui o arquivo do seu Extrato Bancário
+                      </p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        Suporta arquivos <span className="text-purple-300 font-bold">OFX, CSV, PDF, TXT</span> e fotos/prints <span className="text-purple-300 font-bold">PNG/JPG</span> de extrato
+                      </p>
+                    </div>
+                  </label>
+
+                  {statementFile && (
+                    <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-purple-300 font-semibold">
+                      <FileSpreadsheet className="w-4 h-4" />
+                      <span>{statementFile.name} ({(statementFile.size / 1024).toFixed(1)} KB)</span>
                     </div>
                   )}
                 </div>
 
-                {analyzedReceipt && (
-                  <button
-                    onClick={handleSaveReceipt}
-                    disabled={isSaving}
-                    className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-600/30"
-                  >
-                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                    Confirmar & Lançar no Sistema
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
+                {/* Text Area for manual text / direct paste */}
+                <div className="space-y-1 pt-1">
+                  <label className="block text-[11px] font-semibold text-slate-400">
+                    Ou cole o conteúdo de texto / extrato manualmente:
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={statementText}
+                    onChange={(e) => setStatementText(e.target.value)}
+                    placeholder="Cole aqui o conteúdo do arquivo OFX, CSV ou linhas do extrato (Ex: 05/08/2026 Supermercado -R$ 150,00)..."
+                    className="w-full p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 font-mono"
+                  />
+                </div>
 
-          {/* TAB 2: STATEMENT PARSER (OFX / CSV / PDF) */}
-          {activeTab === "statement" && (
-            <div className="space-y-6">
-              <div className="glass-card p-6 rounded-2xl border border-slate-800 space-y-4">
-                <h3 className="font-bold text-base text-white flex items-center gap-2">
-                  <FileSpreadsheet className="w-5 h-5 text-purple-400" /> Importar Extrato Bancário (OFX / CSV / Texto)
-                </h3>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Cole o conteúdo do seu extrato bancário ou arquivo OFX/CSV para que o Agente IA processe todas as movimentações do mês em lote.
-                </p>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-semibold text-slate-400 shrink-0">Conta Bancária Destino:</label>
+                    <select
+                      value={statementAccount}
+                      onChange={(e) => setStatementAccount(e.target.value)}
+                      className="px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-purple-500 shrink-0"
+                    >
+                      <option value="">Todas as Contas</option>
+                      {accounts.map(a => (
+                        <option key={a.id} value={a.id}>{a.name}</option>
+                      ))}
+                    </select>
+                  </div>
 
-                <textarea
-                  rows={5}
-                  value={statementText}
-                  onChange={(e) => setStatementText(e.target.value)}
-                  placeholder="Cole aqui o conteúdo do arquivo OFX ou linhas do extrato (Ex: 05/08/2026 Supermercado -R$ 150,00)..."
-                  className="w-full p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 font-mono"
-                />
-
-                <div className="flex justify-end">
                   <button
                     onClick={() => handleAnalyzeStatement()}
                     disabled={isAnalyzingStatement}
-                    className="px-6 py-2.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-semibold flex items-center gap-2 transition-all shadow-lg shadow-purple-600/30"
+                    className="px-6 py-2.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow-lg shadow-purple-600/30"
                   >
                     {isAnalyzingStatement ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
                     Processar Extrato
@@ -707,22 +1043,35 @@ export default function AgentPage() {
                 <div className="glass-card p-6 rounded-2xl border border-slate-800 space-y-4">
                   <div className="flex items-center justify-between flex-wrap gap-4">
                     <div>
-                      <h4 className="font-bold text-sm text-white">Transações Identificadas no Extrato ({statementItems.length})</h4>
-                      <p className="text-xs text-slate-400">Selecione os lançamentos que deseja salvar no seu controle financeiro</p>
+                      <h4 className="font-bold text-sm text-white flex items-center gap-2">
+                        Transações Identificadas no Extrato ({statementItems.length})
+                        {statementItems.some(i => i.already_exists) && (
+                          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                            ⚠️ {statementItems.filter(i => i.already_exists).length} já cadastrados (desmarcados automaticamente)
+                          </span>
+                        )}
+                      </h4>
+                      <p className="text-xs text-slate-400">Marque apenas as transações que deseja importar para evitar relançamentos duplicados.</p>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        onClick={toggleSelectOnlyNewStatements}
+                        className="px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/40 rounded-lg text-xs font-bold text-purple-300 hover:text-white transition-all"
+                      >
+                        ✨ Selecionar Apenas Novas ({statementItems.filter(i => !i.already_exists).length})
+                      </button>
                       <button
                         onClick={() => toggleSelectAllStatements(true)}
                         className="px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs font-semibold text-slate-300 hover:bg-slate-800"
                       >
-                        Selecionar Todos
+                        Selecionar Todas
                       </button>
                       <button
                         onClick={() => toggleSelectAllStatements(false)}
                         className="px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs font-semibold text-slate-400 hover:bg-slate-800"
                       >
-                        Desmarcar Todos
+                        Desmarcar Todas
                       </button>
 
                       <button
@@ -741,16 +1090,24 @@ export default function AgentPage() {
                       <thead className="bg-slate-900 text-slate-400 font-bold border-b border-slate-800 uppercase tracking-wider text-[11px]">
                         <tr>
                           <th className="p-3 w-10 text-center">Sel.</th>
+                          <th className="p-3">Status / Verificação</th>
                           <th className="p-3">Título / Descrição</th>
                           <th className="p-3">Data</th>
                           <th className="p-3">Tipo</th>
                           <th className="p-3">Valor</th>
                           <th className="p-3">Categoria</th>
+                          <th className="p-3">Membro</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-800/60">
                         {statementItems.map((item) => (
-                          <tr key={item.id} className={`hover:bg-slate-800/30 ${item.selected ? "bg-slate-900/60" : "opacity-60"}`}>
+                          <tr key={item.id} className={`hover:bg-slate-800/30 transition-colors ${
+                            item.already_exists 
+                              ? "bg-amber-950/20 opacity-75" 
+                              : item.selected 
+                              ? "bg-slate-900/60" 
+                              : "opacity-60"
+                          }`}>
                             <td className="p-3 text-center">
                               <input
                                 type="checkbox"
@@ -759,7 +1116,25 @@ export default function AgentPage() {
                                 className="w-4 h-4 accent-purple-500 rounded cursor-pointer"
                               />
                             </td>
-                            <td className="p-3 font-semibold text-slate-200">{item.title}</td>
+                            <td className="p-3">
+                              {item.already_exists ? (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 inline-flex items-center gap-1">
+                                  ⚠️ Já Lançado
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 inline-flex items-center gap-1">
+                                  ✨ Novo
+                                </span>
+                              )}
+                            </td>
+                            <td className="p-3 font-semibold text-slate-200">
+                              {item.title}
+                              {item.already_exists && (
+                                <span className="block text-[10px] text-amber-400 font-normal mt-0.5">
+                                  (Coincide com item salvo: "{item.existing_title || item.title}")
+                                </span>
+                              )}
+                            </td>
                             <td className="p-3 text-slate-400 font-mono">{item.due_date}</td>
                             <td className="p-3">
                               <span className={`px-2 py-0.5 rounded-md font-semibold text-[11px] ${
@@ -785,6 +1160,24 @@ export default function AgentPage() {
                                 ))}
                               </select>
                             </td>
+                            <td className="p-3">
+                              <select
+                                value={item.user_id || ""}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setStatementItems(prev => prev.map(i => i.id === item.id ? { ...i, user_id: val } : i));
+                                }}
+                                className="px-2 py-1 bg-slate-900 border border-slate-800 rounded text-xs text-indigo-300 focus:outline-none"
+                              >
+                                {familyMembers && familyMembers.length > 0 ? (
+                                  familyMembers.map((m: any) => (
+                                    <option key={m.id} value={m.id}>{m.name}</option>
+                                  ))
+                                ) : (
+                                  <option value={user?.id || ""}>{user?.name || "Você"}</option>
+                                )}
+                              </select>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -805,7 +1198,15 @@ export default function AgentPage() {
                     <Bot className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-sm text-white">Agente IA Assistente Financeiro</h3>
+                    <h3 className="font-bold text-sm text-white flex items-center gap-2">
+                      Agente IA Assistente Financeiro
+                      <HelpTooltip
+                        id="agent_chat_help"
+                        title="Chat com Agente IA"
+                        description="Converse naturalmente com seu assistente. Peça relatórios de saldo, análises de gastos do mês ou conselhos de economia."
+                        actionHint="Clique em uma sugestão rápida ou digite sua pergunta abaixo."
+                      />
+                    </h3>
                     <p className="text-[11px] text-emerald-400 flex items-center gap-1">
                       <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" /> Online e Ativo
                     </p>
@@ -827,7 +1228,7 @@ export default function AgentPage() {
                           : "bg-slate-900 border border-slate-800 text-slate-200 rounded-bl-none"
                       }`}
                     >
-                      <p className="leading-relaxed">{msg.text}</p>
+                      <p className="leading-relaxed whitespace-pre-wrap">{msg.text}</p>
 
                       {/* Enhanced Proposal Card in Agent Message */}
                       {msg.proposal && (
@@ -876,13 +1277,39 @@ export default function AgentPage() {
                 )}
               </div>
 
+              {/* Quick Suggestion Chips */}
+              <div className="px-3 py-2 bg-slate-900/90 border-t border-slate-800 flex items-center gap-2 overflow-x-auto text-[11px]">
+                <span className="text-slate-500 font-semibold shrink-0">Sugestões:</span>
+                <button
+                  type="button"
+                  onClick={() => sendDirectMessage("Qual meu saldo e resumo do mês?")}
+                  className="px-2.5 py-1 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-lg text-indigo-300 hover:text-white shrink-0 transition-colors"
+                >
+                  📊 Resumo do Mês
+                </button>
+                <button
+                  type="button"
+                  onClick={() => sendDirectMessage("Me dá dicas de economia para este mês")}
+                  className="px-2.5 py-1 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-lg text-emerald-300 hover:text-white shrink-0 transition-colors"
+                >
+                  💡 Dicas de Economia
+                </button>
+                <button
+                  type="button"
+                  onClick={() => sendDirectMessage("Gastei R$ 45.00 no almoço")}
+                  className="px-2.5 py-1 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-lg text-amber-300 hover:text-white shrink-0 transition-colors"
+                >
+                  🛒 Lançar Almoço R$ 45
+                </button>
+              </div>
+
               {/* Chat Input */}
               <form onSubmit={handleSendChatMessage} className="p-3 bg-slate-900 border-t border-slate-800 flex items-center gap-2">
                 <input
                   type="text"
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
-                  placeholder="Digite uma frase (ex: Almoço R$ 45 no cartão)..."
+                  placeholder="Digite uma pergunta ou frase (ex: Quanto gastei este mês?)..."
                   className="flex-1 px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
                 />
                 <button
@@ -895,8 +1322,20 @@ export default function AgentPage() {
               </form>
             </div>
           )}
+          {/* Statement Import Confirmation Modal */}
+          <ConfirmStatementImportModal
+            isOpen={isConfirmStatementModalOpen}
+            onClose={() => setIsConfirmStatementModalOpen(false)}
+            onConfirm={handleExecuteSaveStatementBatch}
+            items={statementItems}
+            accountName={accounts.find((a: any) => a.id === statementAccount)?.name}
+            categories={categories}
+            familyMembers={familyMembers}
+            isSaving={isSaving}
+          />
         </main>
       </div>
+      <BottomNav user={user} />
     </div>
   );
 }

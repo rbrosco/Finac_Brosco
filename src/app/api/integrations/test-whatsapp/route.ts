@@ -11,24 +11,32 @@ export async function POST(req: NextRequest) {
     const user = await getAuthUser(req);
     if (!user) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
 
-    const { targetNumber } = await req.json();
+    const body = await req.json();
+    const { targetNumber, evolution_api_url, evolution_api_key, evolution_instance_name } = body;
 
     const dataSource = await getDataSource();
     const configRepo = dataSource.getRepository(IntegrationConfig);
-    const config = await configRepo.findOne({ where: { user_id: user.id } });
+    let config = await configRepo.findOne({ where: { user_id: user.id } });
 
     if (!config) {
-      return NextResponse.json({ error: "Configurações de integração não encontradas." }, { status: 400 });
+      config = configRepo.create({ user_id: user.id });
     }
 
-    const numberToSend = targetNumber || config.whatsapp_number;
+    const effectiveConfig: Partial<IntegrationConfig> = {
+      ...config,
+      evolution_api_url: evolution_api_url ? evolution_api_url.trim() : config.evolution_api_url,
+      evolution_api_key: evolution_api_key ? evolution_api_key.trim() : config.evolution_api_key,
+      evolution_instance_name: evolution_instance_name ? evolution_instance_name.trim() : config.evolution_instance_name,
+    };
+
+    const numberToSend = targetNumber || effectiveConfig.whatsapp_number;
     if (!numberToSend) {
       return NextResponse.json({ error: "Informe o número de WhatsApp com DDD para teste." }, { status: 400 });
     }
 
-    const testMessage = `🤖 *Finac Brosco - Teste de Integração WhatsApp*\n\nOlá *${user.name}*!\n\nA integração do seu sistema financeiro com a Evolution API está funcionando com sucesso! 🎉\n\n📌 *Instância:* ${config.evolution_instance_name}\n⏰ *Data:* ${new Date().toLocaleString("pt-BR")}`;
+    const testMessage = `🤖 *Finac Brosco - Teste de Integração WhatsApp*\n\nOlá *${user.name}*!\n\nA integração do seu sistema financeiro com a Evolution API está funcionando com sucesso! 🎉\n\n📌 *Instância:* ${effectiveConfig.evolution_instance_name}\n⏰ *Data:* ${new Date().toLocaleString("pt-BR")}`;
 
-    const result = await sendWhatsAppMessage(config, numberToSend, testMessage);
+    const result = await sendWhatsAppMessage(effectiveConfig, numberToSend, testMessage);
 
     return NextResponse.json({
       success: true,

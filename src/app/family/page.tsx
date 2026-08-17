@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/layout/Sidebar";
+import BottomNav from "@/components/layout/BottomNav";
 import Header from "@/components/layout/Header";
 import {
   Users,
@@ -20,8 +21,10 @@ import {
   AlertCircle,
   Sparkles,
   LogOut,
-  ChevronRight
+  ChevronRight,
+  Calculator
 } from "lucide-react";
+import HouseBillSplitter from "@/components/family/HouseBillSplitter";
 
 export default function FamilyPage() {
   const router = useRouter();
@@ -31,6 +34,7 @@ export default function FamilyPage() {
   const [currentMonth, setCurrentMonth] = useState(initialMonth);
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<"members" | "splitter">("members");
 
   // Family State
   const [familyData, setFamilyData] = useState<any>(null); // { family, members, userRole, userIds }
@@ -200,6 +204,19 @@ export default function FamilyPage() {
     window.open(`https://wa.me/?text=${text}`, "_blank");
   };
 
+  const handleSaveSplitterToDatabase = async (splitItems: any[]) => {
+    const res = await fetch("/api/agent/confirm-batch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items: splitItems })
+    });
+
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || "Erro ao gravar divisão de contas.");
+    }
+  };
+
   const isOwnerOrAdmin = familyData?.userRole === "ADMIN";
 
   return (
@@ -214,15 +231,36 @@ export default function FamilyPage() {
           user={user}
         />
 
-        <main className="flex-1 p-4 md:p-8 space-y-6 max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-4 md:p-6 space-y-6 w-full">
           {/* Header Title */}
           <div>
             <h1 className="text-2xl font-extrabold text-white tracking-tight flex items-center gap-2.5">
-              <Users className="w-7 h-7 text-brand-400" /> Controle Financeiro Familiar
+              <Users className="w-7 h-7 text-brand-400" /> Controle Financeiro Familiar & Divisão de Contas
             </h1>
             <p className="text-xs text-slate-400 mt-1">
-              Vincule cônjuges e membros da família para compartilhar o controle financeiro, contas e orçamentos domésticos.
+              Gerencie membros da casa e divida contas de Água, Luz, Mercado e Aluguel de forma justa e estratégica.
             </p>
+          </div>
+
+          {/* Tab Navigation */}
+          <div className="flex items-center gap-2 p-1.5 bg-slate-900/90 border border-slate-800 rounded-2xl w-fit">
+            <button
+              onClick={() => setActiveTab("members")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+                activeTab === "members" ? "bg-brand-600 text-white shadow-lg shadow-brand-600/30" : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Users className="w-4 h-4" /> Membros & Grupo Familiar
+            </button>
+
+            <button
+              onClick={() => setActiveTab("splitter")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+                activeTab === "splitter" ? "bg-purple-600 text-white shadow-lg shadow-purple-600/30" : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Calculator className="w-4 h-4" /> 🧮 Calculadora de Divisão de Contas
+            </button>
           </div>
 
           {/* Feedback Messages */}
@@ -246,7 +284,14 @@ export default function FamilyPage() {
             </div>
           )}
 
-          {loading ? (
+          {activeTab === "splitter" ? (
+            <HouseBillSplitter
+              familyMembers={familyData?.members || []}
+              currentUserId={user?.id}
+              currentMonth={currentMonth}
+              onSaveToTransactions={handleSaveSplitterToDatabase}
+            />
+          ) : loading ? (
             <div className="flex flex-col items-center justify-center min-h-[300px]">
               <Loader2 className="w-8 h-8 text-brand-500 animate-spin mb-2" />
               <p className="text-xs text-slate-400">Carregando informações familiares...</p>
@@ -457,6 +502,7 @@ export default function FamilyPage() {
           )}
         </main>
       </div>
+      <BottomNav user={user} />
     </div>
   );
 }

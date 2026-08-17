@@ -12,10 +12,13 @@ import {
   X,
   TrendingUp,
   Receipt,
-  LogOut
+  LogOut,
+  PanelLeftClose,
+  PanelLeftOpen
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useSidebar } from "@/context/SidebarContext";
 
 interface HeaderProps {
   currentMonth: string; // YYYY-MM
@@ -26,6 +29,9 @@ interface HeaderProps {
   user?: { name: string; email: string } | null;
 }
 
+import { useTutorial } from "@/context/TutorialContext";
+import { HelpCircle, Calculator } from "lucide-react";
+
 export default function Header({
   currentMonth,
   onMonthChange,
@@ -35,6 +41,8 @@ export default function Header({
   user,
 }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { isCollapsed, toggleSidebar } = useSidebar();
+  const { openTutorial } = useTutorial();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -68,73 +76,107 @@ export default function Header({
   };
 
   return (
-    <header className="sticky top-0 z-30 glass-panel border-b border-slate-800/80 px-4 md:px-8 py-4">
-      <div className="flex items-center justify-between gap-4">
-        {/* Left: Mobile Title / Month Navigator */}
-        <div className="flex items-center gap-3">
+    <header className="sticky top-0 z-30 glass-panel border-b border-slate-800/80 px-4 md:px-6 py-3.5 w-full">
+      <div className="flex items-center justify-between gap-4 flex-wrap sm:flex-nowrap">
+        {/* Left: Mobile Title / Sidebar Toggle / Month Navigator */}
+        <div className="flex items-center gap-2.5">
+          {/* Mobile Drawer Button */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 md:hidden text-slate-300 hover:text-white bg-slate-800/60 rounded-lg"
+            className="p-2 md:hidden text-slate-300 hover:text-white bg-slate-800/60 rounded-xl"
+            title="Menu mobile"
           >
-            {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+
+          {/* Desktop Quick Toggle Button (Header) */}
+          <button
+            onClick={toggleSidebar}
+            className="hidden md:flex p-2 text-slate-400 hover:text-white bg-slate-900/80 border border-slate-800 hover:bg-slate-800 rounded-xl transition-colors shrink-0"
+            title={isCollapsed ? "Expandir Menu Lateral" : "Recolher Menu Lateral"}
+          >
+            {isCollapsed ? (
+              <PanelLeftOpen className="w-4 h-4 text-brand-400" />
+            ) : (
+              <PanelLeftClose className="w-4 h-4" />
+            )}
           </button>
 
           {/* Month Navigator */}
-          <div className="flex items-center bg-slate-900/90 border border-slate-800 rounded-xl p-1 shadow-inner">
+          <div className="flex items-center bg-slate-900/90 border border-slate-800 rounded-xl p-1 shadow-inner max-w-full">
             <button
               onClick={handlePrevMonth}
-              className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+              className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors shrink-0"
               title="Mês Anterior"
             >
-              <ChevronLeft className="w-5 h-5" />
+              <ChevronLeft className="w-4 h-4" />
             </button>
 
-            <div className="flex items-center gap-2 px-3 min-w-[140px] justify-center">
-              <Calendar className="w-4 h-4 text-brand-400" />
-              <span className="text-sm font-semibold text-slate-100 capitalize">
+            <div className="flex items-center gap-2 px-3 min-w-0 justify-center">
+              <Calendar className="w-4 h-4 text-brand-400 shrink-0" />
+              <span className="text-xs sm:text-sm font-semibold text-slate-100 capitalize truncate max-w-[150px] sm:max-w-none">
                 {monthLabel}
               </span>
             </div>
 
             <button
               onClick={handleNextMonth}
-              className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+              className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors shrink-0"
               title="Próximo Mês"
             >
-              <ChevronRight className="w-5 h-5" />
+              <ChevronRight className="w-4 h-4" />
             </button>
           </div>
         </div>
 
         {/* Right Action Buttons */}
-        <div className="hidden sm:flex items-center gap-2.5">
+        <div className="hidden sm:flex items-center gap-2 flex-wrap justify-end">
+          <button
+            onClick={() => router.push("/split-calculator")}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-purple-300 bg-purple-950/80 hover:bg-purple-900 border border-purple-800/80 rounded-xl transition-all shadow-sm shrink-0"
+            title="Calculadora Estratégica de Divisão de Contas"
+          >
+            <Calculator className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+            <span>🧮 Divisão de Contas</span>
+          </button>
+
+          <button
+            onClick={openTutorial}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-brand-300 bg-brand-950/80 hover:bg-brand-900 border border-brand-800/80 rounded-xl transition-all shadow-sm shrink-0"
+            title="Abrir Tutorial e Guia da Plataforma (?)"
+          >
+            <HelpCircle className="w-3.5 h-3.5 text-brand-400 animate-pulse shrink-0" />
+            <span>(?) Tutorial</span>
+          </button>
           {onSeedDemoData && (
             <button
               onClick={onSeedDemoData}
-              className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-purple-300 bg-purple-950/60 hover:bg-purple-900/80 border border-purple-800/60 rounded-xl transition-all shadow-sm"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-purple-300 bg-purple-950/60 hover:bg-purple-900/80 border border-purple-800/60 rounded-xl transition-all shadow-sm shrink-0"
               title="Preencher com lançamentos de exemplo para testar os gráficos"
             >
-              <Sparkles className="w-3.5 h-3.5 text-purple-400 animate-pulse" />
-              Gerar Dados Demo
+              <Sparkles className="w-3.5 h-3.5 text-purple-400 animate-pulse shrink-0" />
+              <span className="hidden xl:inline">Gerar Dados Demo</span>
+              <span className="xl:hidden">Demo</span>
             </button>
           )}
 
           {onProcessRecurring && (
             <button
               onClick={onProcessRecurring}
-              className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-indigo-300 bg-indigo-950/60 hover:bg-indigo-900/80 border border-indigo-800/60 rounded-xl transition-all shadow-sm"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-300 bg-indigo-950/60 hover:bg-indigo-900/80 border border-indigo-800/60 rounded-xl transition-all shadow-sm shrink-0"
               title="Gerar despesas fixas recorrentes pendentes no mês atual"
             >
-              <RefreshCw className="w-3.5 h-3.5 text-indigo-400" />
-              Processar Mês
+              <RefreshCw className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+              <span className="hidden xl:inline">Processar Mês</span>
+              <span className="xl:hidden">Processar</span>
             </button>
           )}
 
           {/* New Transaction Action Buttons */}
-          <div className="flex items-center gap-1.5 bg-slate-900/90 p-1 border border-slate-800/80 rounded-xl shadow-inner">
+          <div className="flex items-center gap-1.5 bg-slate-900/90 p-1 border border-slate-800/80 rounded-xl shadow-inner shrink-0">
             <button
               onClick={() => onOpenTransactionModal("income")}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-lg transition-all shadow-sm"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-lg transition-all shadow-sm"
               title="Nova Receita"
             >
               <Plus className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
@@ -142,7 +184,7 @@ export default function Header({
             </button>
             <button
               onClick={() => onOpenTransactionModal("fixed_expense")}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-purple-400 hover:text-purple-300 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 rounded-lg transition-all shadow-sm"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-purple-400 hover:text-purple-300 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 rounded-lg transition-all shadow-sm"
               title="Nova Despesa Fixa"
             >
               <Plus className="w-3.5 h-3.5 text-purple-400 shrink-0" />
@@ -150,7 +192,7 @@ export default function Header({
             </button>
             <button
               onClick={() => onOpenTransactionModal("variable_expense")}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-rose-400 hover:text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 rounded-lg transition-all shadow-sm"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-rose-400 hover:text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 rounded-lg transition-all shadow-sm"
               title="Novo Gasto Variável"
             >
               <Plus className="w-3.5 h-3.5 text-rose-400 shrink-0" />
@@ -217,6 +259,13 @@ export default function Header({
               className={`block px-3 py-2 rounded-lg text-sm font-medium ${pathname === "/transactions" ? "bg-brand-600 text-white" : "text-slate-300"}`}
             >
               Transações
+            </Link>
+            <Link
+              href="/caixinha"
+              onClick={() => setMobileMenuOpen(false)}
+              className={`block px-3 py-2 rounded-lg text-sm font-medium ${pathname === "/caixinha" ? "bg-brand-600 text-white" : "text-slate-300"}`}
+            >
+              Caixinha
             </Link>
             <Link
               href="/agent"

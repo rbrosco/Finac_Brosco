@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth";
 import { getDataSource } from "@/lib/db/data-source";
+import { User } from "@/lib/db/entities/User";
 import { Category } from "@/lib/db/entities/Category";
 import { Account } from "@/lib/db/entities/Account";
 import { IntegrationConfig } from "@/lib/db/entities/IntegrationConfig";
@@ -35,11 +36,15 @@ export async function POST(req: NextRequest) {
       where: { user_id: In(userIds) }
     });
 
-    const result = await analyzeReceiptDocument(content || "", fileName || "", categories, accounts, config, fileData);
+    const userRepo = dataSource.getRepository(User);
+    const familyUsers = await userRepo.find({ where: { id: In(userIds) } });
+
+    const result = await analyzeReceiptDocument(content || "", fileName || "", categories, accounts, config, fileData, familyUsers);
 
     return NextResponse.json({
       success: true,
-      result
+      result,
+      familyMembers: familyUsers.map(u => ({ id: u.id, name: u.name, email: u.email }))
     });
   } catch (error) {
     console.error("POST Analyze Receipt Error:", error);

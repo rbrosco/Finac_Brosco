@@ -3,12 +3,14 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/layout/Sidebar";
+import BottomNav from "@/components/layout/BottomNav";
 import Header from "@/components/layout/Header";
 import OverviewCards from "@/components/dashboard/OverviewCards";
 import CategoryPieChart from "@/components/dashboard/CategoryPieChart";
 import MonthlyBarChart from "@/components/dashboard/MonthlyBarChart";
 import RecentTransactions from "@/components/dashboard/RecentTransactions";
 import TransactionModal from "@/components/transactions/TransactionModal";
+import HelpTooltip from "@/components/common/HelpTooltip";
 import { Loader2 } from "lucide-react";
 
 export default function DashboardPage() {
@@ -142,7 +144,7 @@ export default function DashboardPage() {
           user={user}
         />
 
-        <main className="flex-1 p-4 md:p-8 space-y-6 max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-4 md:p-6 space-y-6 w-full">
           {loading ? (
             <div className="flex flex-col items-center justify-center min-h-[400px]">
               <Loader2 className="w-10 h-10 text-brand-500 animate-spin mb-3" />
@@ -150,6 +152,22 @@ export default function DashboardPage() {
             </div>
           ) : stats ? (
             <>
+              {/* Dashboard Title & Help */}
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h1 className="text-2xl font-extrabold text-white tracking-tight flex items-center gap-2">
+                    Visão Geral Financeira
+                    <HelpTooltip
+                      id="dashboard_overview_help"
+                      title="Painel de Controle Financeiro"
+                      description="Acompanhe suas receitas, despesas fixas, gastos variáveis e saldo em tempo real no mês selecionado."
+                      actionHint="Navegue entre os meses no topo ou adicione lançamentos pelos botões verdes/vermelhos."
+                    />
+                  </h1>
+                  <p className="text-xs text-slate-400 mt-0.5">Resumo consolidado do desempenho e fluxo de caixa do mês</p>
+                </div>
+              </div>
+
               {/* Overview KPI Cards */}
               <OverviewCards stats={stats} />
 
@@ -186,6 +204,7 @@ export default function DashboardPage() {
         categories={categories}
         accounts={accounts}
       />
+      <BottomNav user={user} />
     </div>
   );
 }

@@ -55,6 +55,8 @@ export async function POST(req: NextRequest) {
     if (body.evolution_api_key !== undefined) config.evolution_api_key = body.evolution_api_key.trim();
     if (body.evolution_instance_name !== undefined) config.evolution_instance_name = body.evolution_instance_name.trim();
     if (body.whatsapp_number !== undefined) config.whatsapp_number = body.whatsapp_number ? body.whatsapp_number.trim() : null;
+    if (body.evolution_keyword !== undefined) config.evolution_keyword = body.evolution_keyword ? body.evolution_keyword.trim() : "finac";
+    if (body.require_keyword !== undefined) config.require_keyword = Boolean(body.require_keyword);
     if (body.n8n_webhook_url !== undefined) config.n8n_webhook_url = body.n8n_webhook_url ? body.n8n_webhook_url.trim() : null;
     if (body.webhook_secret !== undefined) config.webhook_secret = body.webhook_secret.trim();
     if (body.is_whatsapp_enabled !== undefined) config.is_whatsapp_enabled = Boolean(body.is_whatsapp_enabled);
