@@ -413,7 +413,7 @@ export default function CaixinhaPage() {
           user={user}
         />
 
-        <main className="flex-1 p-4 md:p-6 space-y-6 w-full max-w-7xl mx-auto">
+        <main className="flex-1 p-4 md:p-6 space-y-6 w-full pb-28 md:pb-8">
           {/* Header Title & Create Button */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>

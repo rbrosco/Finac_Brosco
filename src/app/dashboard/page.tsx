@@ -144,7 +144,7 @@ export default function DashboardPage() {
           user={user}
         />
 
-        <main className="flex-1 p-4 md:p-6 space-y-6 w-full">
+        <main className="flex-1 p-4 md:p-6 space-y-6 w-full pb-28 md:pb-8">
           {loading ? (
             <div className="flex flex-col items-center justify-center min-h-[400px]">
               <Loader2 className="w-10 h-10 text-brand-500 animate-spin mb-3" />
@@ -204,7 +204,8 @@ export default function DashboardPage() {
         categories={categories}
         accounts={accounts}
       />
-      <BottomNav user={user} />
+
+      <BottomNav user={user} onOpenTransactionModal={openTransactionModal} />
     </div>
   );
 }

@@ -5,20 +5,18 @@ import {
   ChevronLeft,
   ChevronRight,
   Plus,
-  Sparkles,
-  RefreshCw,
   Calendar,
   Menu,
   X,
-  TrendingUp,
-  Receipt,
   LogOut,
-  PanelLeftClose,
-  PanelLeftOpen
+  ArrowUpRight,
+  ArrowDownRight,
+  Repeat,
+  Sparkles,
+  FileSpreadsheet,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useSidebar } from "@/context/SidebarContext";
 
 interface HeaderProps {
   currentMonth: string; // YYYY-MM
@@ -29,20 +27,13 @@ interface HeaderProps {
   user?: { name: string; email: string } | null;
 }
 
-import { useTutorial } from "@/context/TutorialContext";
-import { HelpCircle, Calculator } from "lucide-react";
-
 export default function Header({
   currentMonth,
   onMonthChange,
   onOpenTransactionModal,
-  onProcessRecurring,
-  onSeedDemoData,
   user,
 }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { isCollapsed, toggleSidebar } = useSidebar();
-  const { openTutorial } = useTutorial();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -89,19 +80,6 @@ export default function Header({
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
 
-          {/* Desktop Quick Toggle Button (Header) */}
-          <button
-            onClick={toggleSidebar}
-            className="hidden md:flex p-2 text-slate-400 hover:text-white bg-slate-900/80 border border-slate-800 hover:bg-slate-800 rounded-xl transition-colors shrink-0"
-            title={isCollapsed ? "Expandir Menu Lateral" : "Recolher Menu Lateral"}
-          >
-            {isCollapsed ? (
-              <PanelLeftOpen className="w-4 h-4 text-brand-400" />
-            ) : (
-              <PanelLeftClose className="w-4 h-4" />
-            )}
-          </button>
-
           {/* Month Navigator */}
           <div className="flex items-center bg-slate-900/90 border border-slate-800 rounded-xl p-1 shadow-inner max-w-full">
             <button
@@ -129,75 +107,62 @@ export default function Header({
           </div>
         </div>
 
-        {/* Right Action Buttons */}
-        <div className="hidden sm:flex items-center gap-2 flex-wrap justify-end">
-          <button
-            onClick={() => router.push("/split-calculator")}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-purple-300 bg-purple-950/80 hover:bg-purple-900 border border-purple-800/80 rounded-xl transition-all shadow-sm shrink-0"
-            title="Calculadora Estratégica de Divisão de Contas"
-          >
-            <Calculator className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-            <span>🧮 Divisão de Contas</span>
-          </button>
+        {/* Right Action Suite: Premium Quick Lançamento Controls */}
+        <div className="hidden sm:flex items-center gap-2">
+          <div className="flex items-center gap-1.5 bg-slate-900/90 p-1.5 border border-slate-800/90 rounded-2xl shadow-xl backdrop-blur-xl shrink-0">
+            {/* Header Badge */}
+            <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold tracking-wider uppercase text-slate-400 border-r border-slate-800/80 shrink-0 mr-0.5">
+              <Sparkles className="w-3.5 h-3.5 text-brand-400 animate-pulse" />
+              <span>Novo</span>
+            </div>
 
-          <button
-            onClick={openTutorial}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-brand-300 bg-brand-950/80 hover:bg-brand-900 border border-brand-800/80 rounded-xl transition-all shadow-sm shrink-0"
-            title="Abrir Tutorial e Guia da Plataforma (?)"
-          >
-            <HelpCircle className="w-3.5 h-3.5 text-brand-400 animate-pulse shrink-0" />
-            <span>(?) Tutorial</span>
-          </button>
-          {onSeedDemoData && (
-            <button
-              onClick={onSeedDemoData}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-purple-300 bg-purple-950/60 hover:bg-purple-900/80 border border-purple-800/60 rounded-xl transition-all shadow-sm shrink-0"
-              title="Preencher com lançamentos de exemplo para testar os gráficos"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-purple-400 animate-pulse shrink-0" />
-              <span className="hidden xl:inline">Gerar Dados Demo</span>
-              <span className="xl:hidden">Demo</span>
-            </button>
-          )}
-
-          {onProcessRecurring && (
-            <button
-              onClick={onProcessRecurring}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-300 bg-indigo-950/60 hover:bg-indigo-900/80 border border-indigo-800/60 rounded-xl transition-all shadow-sm shrink-0"
-              title="Gerar despesas fixas recorrentes pendentes no mês atual"
-            >
-              <RefreshCw className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-              <span className="hidden xl:inline">Processar Mês</span>
-              <span className="xl:hidden">Processar</span>
-            </button>
-          )}
-
-          {/* New Transaction Action Buttons */}
-          <div className="flex items-center gap-1.5 bg-slate-900/90 p-1 border border-slate-800/80 rounded-xl shadow-inner shrink-0">
+            {/* Receita Button */}
             <button
               onClick={() => onOpenTransactionModal("income")}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-lg transition-all shadow-sm"
-              title="Nova Receita"
+              className="group relative flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-emerald-400 bg-gradient-to-r from-emerald-500/15 via-teal-500/10 to-emerald-500/5 hover:from-emerald-500/25 hover:to-teal-500/25 border border-emerald-500/30 hover:border-emerald-400/80 rounded-xl transition-all duration-300 shadow-[0_0_12px_rgba(16,185,129,0.12)] hover:shadow-[0_0_20px_rgba(16,185,129,0.35)] hover:-translate-y-0.5 active:translate-y-0"
+              title="Nova Receita (Entrada)"
             >
-              <Plus className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-              <span>Receita</span>
+              <div className="w-5 h-5 rounded-lg bg-emerald-500/20 flex items-center justify-center group-hover:bg-emerald-500/30 group-hover:scale-110 transition-all">
+                <ArrowUpRight className="w-3.5 h-3.5 text-emerald-300 group-hover:rotate-12 transition-transform" />
+              </div>
+              <span className="tracking-tight">+ Receita</span>
             </button>
+
+            {/* Despesa Fixa Button */}
             <button
               onClick={() => onOpenTransactionModal("fixed_expense")}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-purple-400 hover:text-purple-300 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 rounded-lg transition-all shadow-sm"
-              title="Nova Despesa Fixa"
+              className="group relative flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-purple-300 bg-gradient-to-r from-purple-500/15 via-indigo-500/10 to-purple-500/5 hover:from-purple-500/25 hover:to-indigo-500/25 border border-purple-500/30 hover:border-purple-400/80 rounded-xl transition-all duration-300 shadow-[0_0_12px_rgba(168,85,247,0.12)] hover:shadow-[0_0_20px_rgba(168,85,247,0.35)] hover:-translate-y-0.5 active:translate-y-0"
+              title="Nova Despesa Fixa (Recorrente)"
             >
-              <Plus className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-              <span>Fixa</span>
+              <div className="w-5 h-5 rounded-lg bg-purple-500/20 flex items-center justify-center group-hover:bg-purple-500/30 group-hover:scale-110 transition-all">
+                <Repeat className="w-3.5 h-3.5 text-purple-300 group-hover:rotate-180 transition-transform duration-500" />
+              </div>
+              <span className="tracking-tight">+ Fixa</span>
             </button>
+
+            {/* Gasto Variável Button */}
             <button
               onClick={() => onOpenTransactionModal("variable_expense")}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-rose-400 hover:text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 rounded-lg transition-all shadow-sm"
-              title="Novo Gasto Variável"
+              className="group relative flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-rose-300 bg-gradient-to-r from-rose-500/15 via-pink-500/10 to-rose-500/5 hover:from-rose-500/25 hover:to-pink-500/25 border border-rose-500/30 hover:border-rose-400/80 rounded-xl transition-all duration-300 shadow-[0_0_12px_rgba(244,63,94,0.12)] hover:shadow-[0_0_20px_rgba(244,63,94,0.35)] hover:-translate-y-0.5 active:translate-y-0"
+              title="Novo Gasto Variável (Avulso)"
             >
-              <Plus className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-              <span>Variável</span>
+              <div className="w-5 h-5 rounded-lg bg-rose-500/20 flex items-center justify-center group-hover:bg-rose-500/30 group-hover:scale-110 transition-all">
+                <ArrowDownRight className="w-3.5 h-3.5 text-rose-300 group-hover:-rotate-12 transition-transform" />
+              </div>
+              <span className="tracking-tight">+ Variável</span>
             </button>
+
+            {/* Importar Extrato / Cupom Button */}
+            <Link
+              href="/agent?tab=receipt"
+              className="group relative flex items-center gap-2 px-3.5 py-1.5 text-xs font-bold text-amber-300 bg-gradient-to-r from-amber-500/20 via-orange-500/15 to-amber-500/10 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/40 hover:border-amber-400/80 rounded-xl transition-all duration-300 shadow-[0_0_12px_rgba(245,158,11,0.15)] hover:shadow-[0_0_20px_rgba(245,158,11,0.35)] hover:-translate-y-0.5 active:translate-y-0"
+              title="Importar Comprovante PIX, Nota Fiscal ou Extrato Bancário"
+            >
+              <div className="w-5 h-5 rounded-lg bg-amber-500/20 flex items-center justify-center group-hover:bg-amber-500/30 group-hover:scale-110 transition-all">
+                <FileSpreadsheet className="w-3.5 h-3.5 text-amber-300" />
+              </div>
+              <span className="tracking-tight">📄 Importar Extrato / Cupom</span>
+            </Link>
           </div>
         </div>
       </div>
@@ -205,44 +170,33 @@ export default function Header({
       {/* Mobile Menu Dropdown */}
       {mobileMenuOpen && (
         <div className="md:hidden mt-4 pt-4 border-t border-slate-800 space-y-3">
+          <Link
+            href="/agent?tab=receipt"
+            onClick={() => setMobileMenuOpen(false)}
+            className="w-full flex items-center justify-center gap-2 py-2.5 px-3 bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/40 text-amber-300 rounded-xl text-xs font-bold shadow-md active:scale-95 transition-all"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-amber-400" /> 📄 Importar Extrato / Cupom
+          </Link>
+
           <div className="grid grid-cols-3 gap-2">
             <button
               onClick={() => { onOpenTransactionModal("income"); setMobileMenuOpen(false); }}
-              className="flex items-center justify-center gap-1.5 py-2 px-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-lg text-xs font-semibold hover:bg-emerald-500/20 transition-all"
+              className="flex items-center justify-center gap-1.5 py-2.5 px-2 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 text-emerald-300 rounded-xl text-xs font-bold shadow-md active:scale-95 transition-all"
             >
-              <Plus className="w-3.5 h-3.5" /> Receita
+              <ArrowUpRight className="w-4 h-4 text-emerald-400" /> Receita
             </button>
             <button
               onClick={() => { onOpenTransactionModal("fixed_expense"); setMobileMenuOpen(false); }}
-              className="flex items-center justify-center gap-1.5 py-2 px-2 bg-purple-500/10 border border-purple-500/20 text-purple-400 rounded-lg text-xs font-semibold hover:bg-purple-500/20 transition-all"
+              className="flex items-center justify-center gap-1.5 py-2.5 px-2 bg-gradient-to-r from-purple-500/20 to-indigo-500/20 border border-purple-500/30 text-purple-300 rounded-xl text-xs font-bold shadow-md active:scale-95 transition-all"
             >
-              <Plus className="w-3.5 h-3.5" /> Fixa
+              <Repeat className="w-4 h-4 text-purple-400" /> Fixa
             </button>
             <button
               onClick={() => { onOpenTransactionModal("variable_expense"); setMobileMenuOpen(false); }}
-              className="flex items-center justify-center gap-1.5 py-2 px-2 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-lg text-xs font-semibold hover:bg-rose-500/20 transition-all"
+              className="flex items-center justify-center gap-1.5 py-2.5 px-2 bg-gradient-to-r from-rose-500/20 to-pink-500/20 border border-rose-500/30 text-rose-300 rounded-xl text-xs font-bold shadow-md active:scale-95 transition-all"
             >
-              <Plus className="w-3.5 h-3.5" /> Variável
+              <ArrowDownRight className="w-4 h-4 text-rose-400" /> Variável
             </button>
-          </div>
-
-          <div className="flex gap-2 pt-2">
-            {onProcessRecurring && (
-              <button
-                onClick={() => { onProcessRecurring(); setMobileMenuOpen(false); }}
-                className="w-full py-2 bg-indigo-950/80 border border-indigo-800 text-indigo-300 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5"
-              >
-                <RefreshCw className="w-3.5 h-3.5" /> Processar Vencimentos
-              </button>
-            )}
-            {onSeedDemoData && (
-              <button
-                onClick={() => { onSeedDemoData(); setMobileMenuOpen(false); }}
-                className="w-full py-2 bg-purple-950/80 border border-purple-800 text-purple-300 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5"
-              >
-                <Sparkles className="w-3.5 h-3.5" /> Gerar Dados Demo
-              </button>
-            )}
           </div>
 
           <nav className="space-y-1 pt-2 border-t border-slate-800">

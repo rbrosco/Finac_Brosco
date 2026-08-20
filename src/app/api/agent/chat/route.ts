@@ -41,21 +41,35 @@ export async function POST(req: NextRequest) {
       where: { user_id: In(userIds) }
     });
 
-    // Calculate current month financial totals for context
+    // Fetch real transactions for context (joining category and account relations)
     const now = new Date();
     const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
     const startDate = `${month}-01`;
     const endDate = `${month}-${new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()}`;
 
-    const transactions = await transactionRepo.createQueryBuilder("t")
+    let transactions = await transactionRepo.createQueryBuilder("t")
+      .leftJoinAndSelect("t.category", "category")
+      .leftJoinAndSelect("t.account", "account")
       .where("t.user_id IN (:...userIds)", { userIds })
       .andWhere("t.due_date >= :startDate AND t.due_date <= :endDate", { startDate, endDate })
+      .orderBy("t.due_date", "DESC")
       .getMany();
+
+    // If current month has few transactions, fetch up to 50 latest transactions overall for context
+    if (transactions.length < 5) {
+      transactions = await transactionRepo.createQueryBuilder("t")
+        .leftJoinAndSelect("t.category", "category")
+        .leftJoinAndSelect("t.account", "account")
+        .where("t.user_id IN (:...userIds)", { userIds })
+        .orderBy("t.due_date", "DESC")
+        .take(50)
+        .getMany();
+    }
 
     let inc = 0;
     let exp = 0;
     for (const t of transactions) {
-      const val = Number(t.amount);
+      const val = Number(t.amount || 0);
       if (t.type === "income") inc += val;
       else exp += val;
     }
@@ -66,7 +80,7 @@ export async function POST(req: NextRequest) {
       balance: inc - exp
     };
 
-    const aiResponse = await callAiChatAssistant(message, config, categories, accounts, summary);
+    const aiResponse = await callAiChatAssistant(message, config, categories, accounts, summary, transactions);
 
     return NextResponse.json({
       success: true,

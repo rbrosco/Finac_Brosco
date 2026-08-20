@@ -102,7 +102,7 @@ export default function ReportsPage() {
           user={user}
         />
 
-        <main className="flex-1 p-4 md:p-6 space-y-6 w-full">
+        <main className="flex-1 p-4 md:p-6 space-y-6 w-full pb-28 md:pb-8">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h1 className="text-2xl font-extrabold text-white tracking-tight flex items-center gap-2">

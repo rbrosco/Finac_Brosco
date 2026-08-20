@@ -40,8 +40,17 @@ export async function GET(req: NextRequest) {
       .getMany();
 
     let totalIncome = 0;
+    let receivedIncome = 0;
+    let pendingIncome = 0;
+
     let totalFixedExpenses = 0;
+    let paidFixedExpenses = 0;
+    let pendingFixedExpenses = 0;
+
     let totalVariableExpenses = 0;
+    let paidVariableExpenses = 0;
+    let pendingVariableExpenses = 0;
+
     let paidExpenses = 0;
     let pendingExpenses = 0;
 
@@ -49,16 +58,34 @@ export async function GET(req: NextRequest) {
 
     for (const t of monthTransactions) {
       const amount = Number(t.amount);
-      if (t.type === TransactionType.INCOME) {
+      const typeStr = String(t.type || "").toLowerCase();
+      const statusStr = String(t.status || "").toLowerCase();
+
+      if (typeStr === "income") {
         totalIncome += amount;
-      } else if (t.type === TransactionType.FIXED_EXPENSE) {
+        if (statusStr === "paid" || statusStr === "recebido" || statusStr === "completed") {
+          receivedIncome += amount;
+        } else {
+          pendingIncome += amount;
+        }
+      } else if (typeStr === "fixed_expense") {
         totalFixedExpenses += amount;
-        if (t.status === TransactionStatus.PAID) paidExpenses += amount;
-        else pendingExpenses += amount;
-      } else if (t.type === TransactionType.VARIABLE_EXPENSE) {
+        if (statusStr === "paid" || statusStr === "pago" || statusStr === "completed") {
+          paidFixedExpenses += amount;
+          paidExpenses += amount;
+        } else {
+          pendingFixedExpenses += amount;
+          pendingExpenses += amount;
+        }
+      } else if (typeStr === "variable_expense") {
         totalVariableExpenses += amount;
-        if (t.status === TransactionStatus.PAID) paidExpenses += amount;
-        else pendingExpenses += amount;
+        if (statusStr === "paid" || statusStr === "pago" || statusStr === "completed") {
+          paidVariableExpenses += amount;
+          paidExpenses += amount;
+        } else {
+          pendingVariableExpenses += amount;
+          pendingExpenses += amount;
+        }
       }
 
       // Group expenses by category
@@ -127,8 +154,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       month,
       totalIncome,
+      receivedIncome,
+      pendingIncome,
       totalFixedExpenses,
+      paidFixedExpenses,
+      pendingFixedExpenses,
       totalVariableExpenses,
+      paidVariableExpenses,
+      pendingVariableExpenses,
       totalExpenses,
       netBalance,
       paidExpenses,

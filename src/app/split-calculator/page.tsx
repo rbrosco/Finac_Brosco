@@ -79,7 +79,7 @@ export default function SplitCalculatorPage() {
           user={user}
         />
 
-        <main className="flex-1 p-4 md:p-6 space-y-6 w-full">
+        <main className="flex-1 p-4 md:p-6 space-y-6 w-full pb-28 md:pb-8">
           {/* Header Title */}
           <div>
             <h1 className="text-2xl font-extrabold text-white tracking-tight flex items-center gap-2.5">

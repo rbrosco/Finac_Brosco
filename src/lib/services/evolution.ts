@@ -6,9 +6,9 @@ export async function sendWhatsAppMessage(
   targetNumber: string,
   message: string
 ) {
-  const baseUrl = (config.evolution_api_url || "http://localhost:9002").replace(/\/$/, "");
+  const baseUrl = (config.evolution_api_url || "http://localhost:9002").replace(/\/+$/, "");
   const apiKey = config.evolution_api_key || process.env.EVOLUTION_API_KEY || "evo_fbpzwxq9n7squlurxxwpioob";
-  const instance = config.evolution_instance_name || "finac_instance";
+  const instance = (config.evolution_instance_name || "finac_instance").trim();
 
   const cleanNumber = targetNumber.replace(/\D/g, "");
   if (!cleanNumber) {
@@ -20,7 +20,7 @@ export async function sendWhatsAppMessage(
   const payload = {
     number: cleanNumber,
     options: {
-      delay: 1200,
+      delay: 500,
       presence: "composing",
       linkPreview: false,
     },
@@ -34,7 +34,7 @@ export async function sendWhatsAppMessage(
       "apikey": apiKey,
     },
     body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(3000), // 3-second timeout
+    signal: AbortSignal.timeout(12000),
   });
 
   if (!response.ok) {

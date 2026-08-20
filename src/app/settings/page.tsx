@@ -493,7 +493,8 @@ export default function SettingsPage() {
           provider: aiProvider,
           baseUrl: aiBaseUrl,
           apiKey: aiApiKey,
-          model: aiModel
+          model: aiModel,
+          prompt: aiPrompt
         })
       });
 
@@ -575,7 +576,7 @@ export default function SettingsPage() {
           user={user}
         />
 
-        <main className="flex-1 p-4 md:p-6 space-y-6 w-full">
+        <main className="flex-1 p-4 md:p-6 space-y-6 w-full pb-28 md:pb-8">
           <div>
             <h1 className="text-2xl font-extrabold text-white tracking-tight flex items-center gap-2">
               <Settings className="w-7 h-7 text-brand-400" /> Configurações & Central de Integrações

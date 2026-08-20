@@ -7,6 +7,7 @@ import BottomNav from "@/components/layout/BottomNav";
 import Header from "@/components/layout/Header";
 import TransactionModal from "@/components/transactions/TransactionModal";
 import ConfirmDeleteModal from "@/components/common/ConfirmDeleteModal";
+import Link from "next/link";
 import {
   Receipt,
   Plus,
@@ -25,7 +26,8 @@ import {
   RefreshCw,
   User,
   Paperclip,
-  X
+  X,
+  FileSpreadsheet
 } from "lucide-react";
 
 export default function TransactionsPage() {
@@ -201,7 +203,7 @@ export default function TransactionsPage() {
           user={user}
         />
 
-        <main className="flex-1 p-4 md:p-6 space-y-6 w-full">
+        <main className="flex-1 p-4 md:p-6 space-y-6 w-full pb-28 md:pb-8">
           {/* Header Title Bar */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
@@ -213,7 +215,14 @@ export default function TransactionsPage() {
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+              <Link
+                href="/agent?tab=receipt"
+                className="px-3.5 py-2.5 bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-amber-500/10 border border-amber-500/40 hover:border-amber-400 text-amber-300 hover:text-white rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-md shadow-amber-500/10 hover:shadow-amber-500/20"
+              >
+                <FileSpreadsheet className="w-4 h-4 text-amber-400" /> 📄 Importar Extrato / Cupom
+              </Link>
+
               <button
                 onClick={handleProcessRecurring}
                 className="px-3.5 py-2.5 bg-indigo-950/80 hover:bg-indigo-900/80 border border-indigo-800 text-indigo-300 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all shadow-sm"
@@ -552,7 +561,7 @@ export default function TransactionsPage() {
         itemName={deletingTransaction?.title}
       />
 
-      <BottomNav user={user} />
+      <BottomNav user={user} onOpenTransactionModal={openNewModal} />
 
       {/* Receipt Image Audit Modal */}
       {activeReceipt && (

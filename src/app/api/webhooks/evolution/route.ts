@@ -64,16 +64,22 @@ export async function POST(req: NextRequest) {
     const accountRepo = dataSource.getRepository(Account);
     const transactionRepo = dataSource.getRepository(Transaction);
 
-    // Find integration config by sender whatsapp_number or default to active config
-    let config = await configRepo.createQueryBuilder("c")
-      .leftJoinAndSelect("c.user", "user")
-      .where("c.whatsapp_number LIKE :num", { num: `%${senderNumber.slice(-8)}%` })
-      .getOne();
+    // Find integration config by sender whatsapp_number (flexible matching for 9th digit variations)
+    const allConfigs = await configRepo.find({ relations: ["user"] });
+    let config = allConfigs.find((c) => {
+      if (!c.whatsapp_number) return false;
+      const cleanDb = c.whatsapp_number.replace(/\D/g, "");
+      if (!cleanDb || !senderNumber) return false;
+      return (
+        cleanDb === senderNumber ||
+        cleanDb.endsWith(senderNumber.slice(-8)) ||
+        senderNumber.endsWith(cleanDb.slice(-8)) ||
+        cleanDb.slice(-7) === senderNumber.slice(-7)
+      );
+    });
 
-    if (!config) {
-      config = await configRepo.createQueryBuilder("c")
-        .leftJoinAndSelect("c.user", "user")
-        .getOne();
+    if (!config && allConfigs.length > 0) {
+      config = allConfigs[0];
     }
 
     if (!config || !config.user) {
@@ -90,8 +96,16 @@ export async function POST(req: NextRequest) {
 
     if (requireKeyword) {
       const keywordRegex = new RegExp(`^(?:#|@)?${keyword}\\b`, "i");
-      if (!keywordRegex.test(lowerText) && !lowerText.includes(keyword) && !attachmentUrl) {
-        return NextResponse.json({ message: `Mensagem ignorada: não contém a palavra-chave "${keyword}"` });
+      const hasKeyword = keywordRegex.test(lowerText) || lowerText.includes(keyword) || Boolean(attachmentUrl);
+
+      if (!hasKeyword) {
+        const hintReply = `🤖 *Finac Brosco:*\n\nOlá! Recebi sua mensagem. Para interagir com seu assistente financeiro, inclua a palavra-chave *${keyword}* no início (ex: *${keyword} gastei 50 mercado* ou *${keyword} saldo*).`;
+        try {
+          await sendWhatsAppMessage(config, senderNumber, hintReply);
+        } catch (wErr: any) {
+          console.warn("Aviso: Falha ao enviar resposta de dica via WhatsApp:", wErr.message);
+        }
+        return NextResponse.json({ message: `Aviso enviado ao usuário sobre a palavra-chave "${keyword}"` });
       }
 
       // Strip keyword prefix if present
@@ -194,7 +208,7 @@ export async function POST(req: NextRequest) {
         const accounts = await accountRepo.find({ where: { user_id: user.id } });
         const summary = { income: inc, expense: exp, balance: inc - exp };
 
-        const aiResponse = await callAiChatAssistant(cleanText, config, categories, accounts, summary);
+        const aiResponse = await callAiChatAssistant(cleanText, config, categories, accounts, summary, tList);
         const replyText = `🤖 *Assistente IA Finac Brosco:*\n\n${aiResponse.text}`;
         await sendWhatsAppMessage(config, senderNumber, replyText);
         return NextResponse.json({ success: true, action: "ai_chat", reply: replyText });

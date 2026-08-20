@@ -7,6 +7,7 @@ import BottomNav from "@/components/layout/BottomNav";
 import Header from "@/components/layout/Header";
 import HelpTooltip from "@/components/common/HelpTooltip";
 import ConfirmStatementImportModal from "@/components/common/ConfirmStatementImportModal";
+import FormattedMarkdown from "@/components/common/FormattedMarkdown";
 import {
   Bot,
   Sparkles,
@@ -28,7 +29,8 @@ import {
   Layers,
   MessageSquare,
   Plus,
-  RefreshCw
+  RefreshCw,
+  Paperclip
 } from "lucide-react";
 
 export default function AgentPage() {
@@ -42,8 +44,8 @@ export default function AgentPage() {
   const [accounts, setAccounts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Active Tab: 'receipt' | 'statement' | 'chat'
-  const [activeTab, setActiveTab] = useState<"receipt" | "statement" | "chat">("receipt");
+  // Active Tab: 'chat' | 'receipt' | 'statement' (Default is now 'chat' for an all-in-one AI assistant experience)
+  const [activeTab, setActiveTab] = useState<"chat" | "receipt" | "statement">("chat");
 
   // Tab 1: Receipt State
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
@@ -131,6 +133,14 @@ export default function AgentPage() {
   useEffect(() => {
     loadUserData();
     loadCategoriesAndAccounts();
+
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get("tab");
+      if (tabParam === "receipt" || tabParam === "statement" || tabParam === "chat") {
+        setActiveTab(tabParam as any);
+      }
+    }
   }, [loadUserData, loadCategoriesAndAccounts]);
 
   // Handle Receipt Upload / Text Analysis
@@ -601,6 +611,140 @@ export default function AgentPage() {
     }
   };
 
+  // Handle Chat File Attachment Upload (Direct OCR / Extraction within Chat thread)
+  const handleChatFileUpload = async (file: File) => {
+    const isImage = file.type.startsWith("image/") || file.name.match(/\.(png|jpe?g|webp)$/i);
+    const isPdf = file.type.includes("pdf") || file.name.toLowerCase().endsWith(".pdf");
+    const timestamp = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+
+    setChatMessages((prev) => [
+      ...prev,
+      {
+        id: `user-file-${Date.now()}`,
+        sender: "user",
+        text: `📎 Anexou o arquivo: ${file.name}`,
+        timestamp,
+      },
+    ]);
+
+    setIsChatThinking(true);
+
+    try {
+      if (isImage || isPdf) {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+          const dataUrl = e.target?.result as string;
+          let ocrText = "";
+          if (isPdf) {
+            ocrText = await extractPdfText(file);
+          }
+          if (!ocrText) {
+            ocrText = await performLocalOcr(dataUrl);
+          }
+
+          const res = await fetch("/api/agent/analyze-receipt", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              content: ocrText || "",
+              fileData: dataUrl || "",
+              fileName: file.name,
+            }),
+          });
+
+          const data = await res.json();
+
+          if (res.ok && data.result) {
+            const resObj = data.result;
+            const proposal = {
+              title: resObj.title || "Comprovante " + file.name,
+              amount: resObj.amount || 0,
+              type: resObj.type || "variable_expense",
+              due_date: resObj.due_date || new Date().toISOString().split("T")[0],
+              category_id: resObj.category_id || (categories[0]?.id || null),
+              account_id: resObj.account_id || (accounts[0]?.id || null),
+              status: "paid",
+              description: resObj.extracted_text_summary || `Comprovante lido no chat: ${file.name}`,
+              attachment_url: dataUrl || null,
+            };
+
+            setChatMessages((prev) => [
+              ...prev,
+              {
+                id: `agent-file-${Date.now()}`,
+                sender: "agent",
+                text: `Li o seu comprovante **"${file.name}"**! Identifiquei os seguintes dados para lançamento:`,
+                timestamp: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+                proposal,
+              },
+            ]);
+          } else {
+            setChatMessages((prev) => [
+              ...prev,
+              {
+                id: `agent-file-${Date.now()}`,
+                sender: "agent",
+                text: `Recebi o arquivo **"${file.name}"**, mas não consegui identificar o valor automaticamente. Alterne para a aba **Leitor de Comprovantes** para fazer o ajuste manual.`,
+                timestamp: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+              },
+            ]);
+          }
+        };
+        reader.readAsDataURL(file);
+      } else {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+          const text = e.target?.result as string;
+          const res = await fetch("/api/agent/analyze-statement", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              content: text || file.name,
+              fileName: file.name,
+            }),
+          });
+          const data = await res.json();
+
+          if (res.ok && data.items && data.items.length > 0) {
+            setStatementItems(data.items);
+            setChatMessages((prev) => [
+              ...prev,
+              {
+                id: `agent-file-${Date.now()}`,
+                sender: "agent",
+                text: `Li seu extrato **"${file.name}"** e encontrei **${data.items.length} movimentações**! Clique na aba **Importador de Extratos** para selecionar e importar em lote.`,
+                timestamp: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+              },
+            ]);
+          } else {
+            setChatMessages((prev) => [
+              ...prev,
+              {
+                id: `agent-file-${Date.now()}`,
+                sender: "agent",
+                text: `Processei o arquivo **"${file.name}"**, mas não encontrei transações no extrato.`,
+                timestamp: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+              },
+            ]);
+          }
+        };
+        reader.readAsText(file);
+      }
+    } catch {
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          id: `agent-file-${Date.now()}`,
+          sender: "agent",
+          text: `Houve um erro ao processar o arquivo no chat.`,
+          timestamp: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+        },
+      ]);
+    } finally {
+      setIsChatThinking(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex bg-slate-950 text-slate-100">
       <Sidebar user={user} />
@@ -613,7 +757,7 @@ export default function AgentPage() {
           user={user}
         />
 
-        <main className="flex-1 p-4 md:p-6 space-y-6 w-full">
+        <main className="flex-1 p-4 md:p-6 space-y-6 w-full pb-28 md:pb-8">
           {/* Header Title */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
@@ -653,28 +797,28 @@ export default function AgentPage() {
           {/* Navigation Tabs */}
           <div className="flex items-center gap-2 p-1.5 bg-slate-900/90 border border-slate-800 rounded-2xl w-fit">
             <button
-              onClick={() => setActiveTab("receipt")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
-                activeTab === "receipt" ? "bg-brand-600 text-white shadow-lg shadow-brand-600/30" : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              <ScanLine className="w-4 h-4" /> Leitor de Comprovantes
-            </button>
-            <button
-              onClick={() => setActiveTab("statement")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
-                activeTab === "statement" ? "bg-purple-600 text-white shadow-lg shadow-purple-600/30" : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              <FileSpreadsheet className="w-4 h-4" /> Importador de Extratos
-            </button>
-            <button
               onClick={() => setActiveTab("chat")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
                 activeTab === "chat" ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/30" : "text-slate-400 hover:text-slate-200"
               }`}
             >
-              <MessageSquare className="w-4 h-4" /> Chat com Agente
+              <MessageSquare className="w-4 h-4" /> 💬 Chat IA Completo
+            </button>
+            <button
+              onClick={() => setActiveTab("receipt")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                activeTab === "receipt" ? "bg-brand-600 text-white shadow-lg shadow-brand-600/30" : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <ScanLine className="w-4 h-4" /> 🧾 Leitor de Comprovantes
+            </button>
+            <button
+              onClick={() => setActiveTab("statement")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                activeTab === "statement" ? "bg-purple-600 text-white shadow-lg shadow-purple-600/30" : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <FileSpreadsheet className="w-4 h-4" /> 📊 Importador de Extratos
             </button>
           </div>
 
@@ -1228,7 +1372,7 @@ export default function AgentPage() {
                           : "bg-slate-900 border border-slate-800 text-slate-200 rounded-bl-none"
                       }`}
                     >
-                      <p className="leading-relaxed whitespace-pre-wrap">{msg.text}</p>
+                      <FormattedMarkdown content={msg.text} />
 
                       {/* Enhanced Proposal Card in Agent Message */}
                       {msg.proposal && (
@@ -1305,6 +1449,28 @@ export default function AgentPage() {
 
               {/* Chat Input */}
               <form onSubmit={handleSendChatMessage} className="p-3 bg-slate-900 border-t border-slate-800 flex items-center gap-2">
+                {/* File Attachment Input Button */}
+                <input
+                  type="file"
+                  id="chat-file-attachment"
+                  accept="image/*,.pdf,.ofx,.csv,.txt"
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      handleChatFileUpload(e.target.files[0]);
+                      e.target.value = "";
+                    }
+                  }}
+                />
+                <label
+                  htmlFor="chat-file-attachment"
+                  className="p-2.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 text-indigo-300 hover:text-white rounded-xl cursor-pointer transition-all flex items-center gap-1.5 text-xs font-semibold shrink-0"
+                  title="Anexar Comprovante PIX, Cupom Fiscal ou Extrato Bancário"
+                >
+                  <Paperclip className="w-4 h-4 text-indigo-400" />
+                  <span className="hidden sm:inline">Anexar Cupom / Extrato</span>
+                </label>
+
                 <input
                   type="text"
                   value={chatInput}

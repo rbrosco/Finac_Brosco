@@ -13,9 +13,17 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     const dataSource = await getDataSource();
     const categoryRepo = dataSource.getRepository(Category);
 
-    const category = await categoryRepo.findOne({ where: { id: params.id, user_id: user.id } });
+    let category = await categoryRepo.findOne({ where: { id: params.id } });
     if (!category) {
-      return NextResponse.json({ error: "Categoria não encontrada ou não editável." }, { status: 404 });
+      return NextResponse.json({ error: "Categoria não encontrada." }, { status: 404 });
+    }
+
+    // If it's a default category, assign user_id to customize it for the user
+    if (category.is_default && !category.user_id) {
+      category.user_id = user.id;
+      category.is_default = false;
+    } else if (category.user_id && category.user_id !== user.id) {
+      return NextResponse.json({ error: "Você não tem permissão para editar esta categoria." }, { status: 403 });
     }
 
     if (name) category.name = name.trim();
@@ -39,9 +47,13 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     const dataSource = await getDataSource();
     const categoryRepo = dataSource.getRepository(Category);
 
-    const category = await categoryRepo.findOne({ where: { id: params.id, user_id: user.id } });
+    const category = await categoryRepo.findOne({ where: { id: params.id } });
     if (!category) {
       return NextResponse.json({ error: "Categoria não encontrada." }, { status: 404 });
+    }
+
+    if (category.user_id && category.user_id !== user.id) {
+      return NextResponse.json({ error: "Você não tem permissão para remover esta categoria." }, { status: 403 });
     }
 
     await categoryRepo.remove(category);

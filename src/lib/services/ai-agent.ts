@@ -30,6 +30,26 @@ export interface ParsedStatementItem {
   raw_text?: string;
 }
 
+export function resolveAiBaseUrl(provider?: string | null, rawBaseUrl?: string | null): string {
+  const p = (provider || "lmstudio").toLowerCase();
+  const customUrl = rawBaseUrl ? rawBaseUrl.trim().replace(/\/+$/, "") : "";
+  if (customUrl) return customUrl;
+
+  switch (p) {
+    case "openai":
+      return "https://api.openai.com/v1";
+    case "groq":
+      return "https://api.groq.com/openai/v1";
+    case "deepseek":
+      return "https://api.deepseek.com/v1";
+    case "ollama":
+      return "http://localhost:11434/v1";
+    case "lmstudio":
+    default:
+      return "http://localhost:1234/v1";
+  }
+}
+
 /**
  * Calls configured LLM provider (LM Studio, OpenAI, Gemini, Groq, DeepSeek, Ollama) to extract financial JSON.
  */
@@ -40,10 +60,10 @@ async function callAiCompletion(
 ): Promise<Partial<AnalyzedReceiptResult> | null> {
   if (!config || !config.is_ai_enabled) return null;
 
-  const provider = config.ai_provider || "lmstudio";
-  let baseUrl = (config.ai_base_url || "http://localhost:1234/v1").replace(/\/+$/, "");
+  const provider = (config.ai_provider || "lmstudio").toLowerCase();
+  const baseUrl = resolveAiBaseUrl(provider, config.ai_base_url);
   const apiKey = config.ai_api_key || "";
-  const model = config.ai_model || "gpt-4o-mini";
+  const model = config.ai_model || (provider === "openai" ? "gpt-4o-mini" : provider === "groq" ? "llama-3.3-70b-versatile" : provider === "deepseek" ? "deepseek-chat" : "gpt-4o-mini");
 
   const systemPrompt = config.ai_prompt_instructions ||
     "Você é um assistente financeiro especialista em OCR de notas fiscais, cupons e recibos bancários. Analise com atenção a imagem/texto e extraia o nome do estabelecimento/loja (title), o valor total final pago (amount), o tipo ('variable_expense', 'fixed_expense' ou 'income') e a data ('YYYY-MM-DD'). Responda EXATAMENTE um objeto JSON válido no formato: {\"title\": \"...\", \"amount\": 45.0, \"type\": \"variable_expense\", \"due_date\": \"2026-08-16\"}. Não inclua texto adicional além do JSON.";
@@ -665,7 +685,8 @@ export async function callAiChatAssistant(
   config: IntegrationConfig | null,
   categories: Category[] = [],
   accounts: Account[] = [],
-  financialSummary?: { income: number; expense: number; balance: number }
+  financialSummary?: { income: number; expense: number; balance: number },
+  transactionsList: any[] = []
 ): Promise<AiChatResponse> {
   const lower = userText.toLowerCase().trim();
 
@@ -680,17 +701,50 @@ export async function callAiChatAssistant(
     proposal = await analyzeReceiptDocument(userText, "chat.txt", categories, accounts, config);
   }
 
-  if (config && config.is_ai_enabled) {
-    const provider = config.ai_provider || "lmstudio";
-    let baseUrl = (config.ai_base_url || "http://localhost:1234/v1").replace(/\/+$/, "");
+  const isAiConfigured = Boolean(
+    config && (config.is_ai_enabled || config.ai_api_key || config.ai_prompt_instructions || config.ai_provider)
+  );
+
+  if (isAiConfigured && config) {
+    const provider = (config.ai_provider || "lmstudio").toLowerCase();
+    const baseUrl = resolveAiBaseUrl(provider, config.ai_base_url);
     const apiKey = config.ai_api_key || "";
-    const model = config.ai_model || "gpt-4o-mini";
+    const model = config.ai_model || (provider === "openai" ? "gpt-4o-mini" : provider === "groq" ? "llama-3.3-70b-versatile" : provider === "deepseek" ? "deepseek-chat" : "gpt-4o-mini");
 
     const contextText = financialSummary
       ? `Resumo Financeiro do Usuário neste Mês:\n- Receitas Totais: R$ ${financialSummary.income.toFixed(2)}\n- Despesas Totais: R$ ${financialSummary.expense.toFixed(2)}\n- Saldo Atual: R$ ${financialSummary.balance.toFixed(2)}`
       : "";
 
-    const systemPrompt = `Você é o Agente IA Assistente Financeiro do sistema Finac Brosco. Responda de forma cortês, objetiva, prestativa e formatada em markdown.\n${contextText}\n\n${config.ai_prompt_instructions || ""}`;
+    let transactionsContext = "";
+    if (transactionsList && transactionsList.length > 0) {
+      const formattedItems = transactionsList.slice(0, 50).map((t) => {
+        const typeStr = t.type === "income" ? "Receita" : t.type === "fixed_expense" ? "Despesa Fixa (Recorrente/Pós-paga)" : "Gasto Variável";
+        const statusStr = t.status === "paid" ? "PAGO / QUITADO" : "PENDENTE / A VENCER (PÓS-PAGO)";
+        const catStr = t.category?.name || "Sem categoria";
+        const accStr = t.account?.name || "Sem conta";
+        const dateStr = t.due_date || "Data N/D";
+        const valStr = `R$ ${Number(t.amount || 0).toFixed(2)}`;
+
+        return `- "${t.title}" | Valor: ${valStr} | Tipo: ${typeStr} | Status: ${statusStr} | Vencimento/Data: ${dateStr} | Conta: ${accStr} | Categoria: ${catStr}`;
+      }).join("\n");
+
+      transactionsContext = `\n\nTRANSAÇÕES E LANÇAMENTOS REAIS REGISTRADOS NO BANCO DE DADOS (${transactionsList.length} lançamentos encontrados):\n${formattedItems}`;
+    } else {
+      transactionsContext = `\n\nTRANSAÇÕES E LANÇAMENTOS REAIS REGISTRADOS NO BANCO DE DADOS:\nNenhum lançamento foi cadastrado no sistema pelo usuário ainda.`;
+    }
+
+    const userPromptInstructions = config.ai_prompt_instructions?.trim()
+      ? `INSTRUÇÕES E PERSONALIDADE DEFINIDAS PELO USUÁRIO (CUMPRA RIGOROSAMENTE):\n${config.ai_prompt_instructions.trim()}\n\n`
+      : "";
+
+    const systemPrompt = `${userPromptInstructions}Você é o Agente IA Assistente Financeiro do sistema Finac Brosco.
+
+REGRAS OBRIGATÓRIAS DE RESPOSTA (SEM EXCEÇÃO):
+1. Para responder perguntas sobre lançamentos, pós-pagos, despesas, receitas ou pagamentos pendentes, consulte ESTRITAMENTE a lista 'TRANSAÇÕES E LANÇAMENTOS REAIS REGISTRADOS NO BANCO DE DADOS' fornecida abaixo.
+2. NUNCA invente, simule ou crie títulos, valores, datas ou compras fictícias. Se a informação não estiver listada no contexto, diga expressamente que o lançamento não existe no sistema.
+3. Responda de forma cortês, objetiva, prestativa e formatada em markdown sem exibir códigos de marcação brutos.
+
+${contextText}${transactionsContext}`.trim();
 
     try {
       if (provider === "gemini" && apiKey) {
@@ -698,13 +752,18 @@ export async function callAiChatAssistant(
         const res = await fetch(geminiUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ contents: [{ parts: [{ text: `${systemPrompt}\n\nPergunta do Usuário: ${userText}` }] }] }),
-          signal: AbortSignal.timeout(8000)
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: `${systemPrompt}\n\n[Mensagem do Usuário]: ${userText}` }] }]
+          }),
+          signal: AbortSignal.timeout(15000)
         });
         if (res.ok) {
           const data = await res.json();
           const txt = data.candidates?.[0]?.content?.parts?.[0]?.text;
           if (txt) return { text: txt, proposal };
+        } else {
+          const errBody = await res.text();
+          console.warn(`Gemini AI Chat Error Status ${res.status}:`, errBody);
         }
       } else {
         const endpoint = baseUrl.endsWith("/chat/completions") ? baseUrl : `${baseUrl}/chat/completions`;
@@ -722,17 +781,42 @@ export async function callAiChatAssistant(
             ],
             temperature: 0.7
           }),
-          signal: AbortSignal.timeout(8000)
+          signal: AbortSignal.timeout(15000)
         });
 
         if (res.ok) {
           const data = await res.json();
           const txt = data.choices?.[0]?.message?.content;
           if (txt) return { text: txt, proposal };
+        } else {
+          const errBody = await res.text();
+          console.warn(`AI Chat Provider Error (${provider} -> ${endpoint}) Status ${res.status}:`, errBody);
         }
       }
     } catch (err) {
-      console.warn("AI Chat Assistant Call Error (falling back to smart heuristic):", err);
+      console.warn("AI Chat Assistant Call Error:", err);
+    }
+  }
+
+  if (proposal && proposal.amount > 0) {
+    return {
+      text: `Entendi! Encontrei um lançamento: **${proposal.title}** no valor de **R$ ${proposal.amount.toFixed(2)}**. Confira os detalhes abaixo e confirme para cadastrar no sistema.`,
+      proposal
+    };
+  }
+
+  // Fallback heuristics using REAL transaction list
+  if (lower.includes("pós pago") || lower.includes("pos pago") || lower.includes("pendente") || lower.includes("contas a pagar")) {
+    const pendings = transactionsList.filter(t => t.status === "pending" || t.type === "fixed_expense");
+    if (pendings.length > 0) {
+      const itemsText = pendings.map(t => `- **${t.title}**: R$ ${Number(t.amount).toFixed(2)} (Vencimento: ${t.due_date}) [Status: ${t.status === "paid" ? "PAGO" : "PENDENTE"}]`).join("\n");
+      return {
+        text: `📋 **Lançamentos Pós-Pagos / Pendentes Encontrados no Sistema:**\n\n${itemsText}`
+      };
+    } else {
+      return {
+        text: `📋 Não encontrei nenhum lançamento pós-pago ou pendente cadastrado no sistema.`
+      };
     }
   }
 

@@ -91,7 +91,7 @@ export default function CategoriesPage() {
           user={user}
         />
 
-        <main className="flex-1 p-4 md:p-6 space-y-6 w-full">
+        <main className="flex-1 p-4 md:p-6 space-y-6 w-full pb-28 md:pb-8">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h1 className="text-2xl font-extrabold text-white tracking-tight flex items-center gap-2">
@@ -143,22 +143,22 @@ export default function CategoriesPage() {
                         </div>
                       </div>
 
-                      {!cat.is_default && (
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => openEditModal(cat)}
-                            className="p-1.5 text-slate-400 hover:text-brand-400 rounded-lg hover:bg-slate-800"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => setDeletingCategory(cat)}
-                            className="p-1.5 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-rose-500/10"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      )}
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => openEditModal(cat)}
+                          title="Editar Categoria"
+                          className="p-1.5 text-slate-400 hover:text-brand-400 rounded-lg hover:bg-slate-800 transition-colors"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setDeletingCategory(cat)}
+                          title="Excluir Categoria"
+                          className="p-1.5 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-rose-500/10 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -173,7 +173,7 @@ export default function CategoriesPage() {
                   {incomeCategories.map((cat) => (
                     <div
                       key={cat.id}
-                      className="glass-card p-4 rounded-xl border border-slate-800 flex items-center justify-between hover:border-slate-700 transition-all"
+                      className="glass-card p-4 rounded-xl border border-slate-800 flex items-center justify-between hover:border-slate-700 transition-all group"
                     >
                       <div className="flex items-center gap-3">
                         <div
@@ -190,22 +190,22 @@ export default function CategoriesPage() {
                         </div>
                       </div>
 
-                      {!cat.is_default && (
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => openEditModal(cat)}
-                            className="p-1.5 text-slate-400 hover:text-brand-400 rounded-lg hover:bg-slate-800"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => setDeletingCategory(cat)}
-                            className="p-1.5 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-rose-500/10"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      )}
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => openEditModal(cat)}
+                          title="Editar Categoria"
+                          className="p-1.5 text-slate-400 hover:text-brand-400 rounded-lg hover:bg-slate-800 transition-colors"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setDeletingCategory(cat)}
+                          title="Excluir Categoria"
+                          className="p-1.5 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-rose-500/10 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
